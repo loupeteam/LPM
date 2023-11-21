@@ -1,0 +1,1 @@
+rmdir "C:\ARSimUser\%1"

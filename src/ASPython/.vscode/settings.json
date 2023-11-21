@@ -1,0 +1,24 @@
+{
+    "cSpell.words": [
+        "DAIP",
+        "ansic",
+        "ctypes",
+        "dir",
+        "etree",
+        "fnmatch",
+        "isdir",
+        "isfile",
+        "iwusr",
+        "lxml",
+        "mkdir",
+        "nargs",
+        "path",
+        "pid",
+        "popen",
+        "shutil",
+        "tcpip",
+        "windll"
+    ],
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
+}
