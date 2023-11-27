@@ -1,0 +1,3 @@
+[submodule "src/ASPython"]
+	path = src/ASPython
+	url = https://github.com/loupeteam/aspython
