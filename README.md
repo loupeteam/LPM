@@ -6,7 +6,7 @@ info@loupe.team
 
 # Description
 
-LPM is the Loupe Package Manager. This tool is designed to make it easy to interact with Loupe packages within the Automation Studio and webHMI ecosystems. It provides a command line interface for installing packages in a project, and for managing their lifecycle (version update, dependency checks, removal, etc).
+LPM is the Loupe Package Manager. This tool is designed to make it easy to interact with Loupe packages within the Automation Studio and Loupe UX ecosystems. It provides a command line interface for installing packages in a project, and for managing their lifecycle (version update, dependency checks, removal, etc).
 
 # Documentation
 
