@@ -1,5 +1,7 @@
 # Change log
 
+- 1.0.1 - Replace all webHMI references with Loupe UX
+
 - 1.0.0 - Public release
 
 - 0.5.3 - Add supporting files in preparation for open-sourcing
