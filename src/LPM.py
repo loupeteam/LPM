@@ -987,13 +987,25 @@ def printLoupePackageList():
 
     if not error:
         packages_sorted = sorted(data, key=lambda x: x["name"])
-        for package in packages_sorted:
-            if package['repository']['description'] is None:
-                package['repository']['description'] = " "
-        name_col_width = max(len(package["name"]) for package in packages_sorted) + 2 
+
+        # Pre-process package descriptions; these are handled separately, as they can be None.
+        package_descriptions = []
+        for package in packages_sorted:       
+            try:
+                if package['repository']['description'] is not None:
+                    package_descriptions.append(package['repository']['description'])
+                else:
+                    package_descriptions.append(" ")
+            except:
+                package_descriptions.append(" ")
+
+        # Determine column widths.
+        name_col_width = max(len(package["name"]) for package in packages_sorted) + 2
         version_col_width = 12
         lastmod_col_width = 14
-        description_col_width = max(len(package['repository']['description']) for package in packages_sorted)
+        description_col_width = max(len(description) for description in package_descriptions)
+        
+        # Print the header.
         print(  "NAME".ljust(name_col_width) + 
                 "VERSIONS".ljust(version_col_width) + 
                 "LASTUPDATED".ljust(lastmod_col_width) + 
@@ -1002,11 +1014,12 @@ def printLoupePackageList():
                 "--------".ljust(version_col_width) + 
                 "-----------".ljust(lastmod_col_width) + 
                 "-----------".ljust(description_col_width))
-        for package in packages_sorted:
+        
+        for idx, package in enumerate(packages_sorted):
             print(  package["name"].ljust(name_col_width) + 
                     str(package["version_count"]).ljust(version_col_width) + 
                     package["updated_at"][:10].ljust(lastmod_col_width) + 
-                    package['repository']['description'].ljust(description_col_width))
+                    package_descriptions[idx].ljust(description_col_width))
     else:
         print(f"Unable to print package list: {error}")
 
