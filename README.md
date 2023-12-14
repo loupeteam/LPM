@@ -1,6 +1,6 @@
 # LPM
 
-![version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Floupeteam%2FLPM%2Fbugfix%2Fviewall-cmd%2Fsrc%2Fversion.json&query=%24.version&label=version)
+![version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Floupeteam%2FLPM%2Fmain%2Fsrc%2Fversion.json&query=%24.version&label=version)
 
 This tool is provided by Loupe.  
 https://loupe.team  
