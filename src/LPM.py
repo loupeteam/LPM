@@ -10,9 +10,6 @@ LPM
 This is a lightweight wrapper around NPM that processes Loupe packages. 
 '''
 
-__version__ = '1.0.1'
-__author__ = 'Andrew Musser'
-
 # Python modules
 import os.path
 import json
@@ -25,6 +22,12 @@ import logging
 import ctypes
 import time
 import requests
+
+with open("version.json", "r") as f:
+    data = json.load(f)
+    __version__ = data["version"]
+
+__author__ = 'Andrew Musser'
 
 # External Modules
 from ASPython import ASTools
