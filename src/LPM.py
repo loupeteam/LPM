@@ -281,39 +281,12 @@ def main():
                 syncPackages(getAllDependencies(packages))
             else: # Handle request to install source code instead.
                 if (len(packages) > 0):
-                    print('Cloning ' + ', '.join(args.packages) + '...')
-                    try:
-                        # First check to see if there is an AS project locally.
-                        project = ASTools.Project('.')
-                        librariesPkg = ASTools.Package('./Logical/Libraries')
-                        try:
-                            # Check for existing Loupe folder.
-                            loupePkg = ASTools.Package('./Logical/Libraries/Loupe')
-                        except:
-                            print('Loupe folder not found, creating it...')
-                            # Add the Loupe package back in there.
-                            loupePkg = librariesPkg.addEmptyPackage('Loupe') 
-                        for package in args.packages:
-                            # Extract version info if included (this would show up after the '@' character, i.e. 'mylib@3.0.4')
-                            # TODO: this check is now redundant with a version check done at the top of this file, so this should get refactored...
-                            if package.find('@') > -1:
-                                splitPackage = package.split('@')
-                                packageName = splitPackage[0]
-                                packageVersion = splitPackage[1]
-                                installSource(packageName, packageVersion, loupePkg)                               
-                            else:
-                                packageName = package
-                                installSource(packageName, '', loupePkg)
-                            # Next, install any dependencies of this source library.
-                            sourceDependencies = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', packageName))
-                            if (len(sourceDependencies) > 0):
-                                # TODO: add support for getting the correct version of these dependencies.
-                                installPackages(sourceDependencies, [''] * len(sourceDependencies))
-                                # Aaand sync those dependencies.
-                                syncPackages(getAllDependencies(sourceDependencies))
-                    except:
-                        cprint('Error while attempting to install source code.', 'yellow')
-                        cprint(sys.exc_info())
+                    print('Attempting to install source for ' + ', '.join(args.packages) + '...')
+
+                sourceDependencies = []
+                for (package, packageVersion) in zip(packages, packageVersions):
+                    installSource(package, packageVersion, sourceDependencies)
+                
             # Deploy relevant objects to cpu.sw.
             # First check project-level settings to see if deployment is configured. 
             deploymentConfigs = getPackageManifestField('package.json', ['lpmConfig', 'deploymentConfigs'])
@@ -359,17 +332,23 @@ def main():
             gitClient = getPackageManifestField('package.json', ['lpmConfig', 'gitClient'])
             if(gitClient == ''):
                 cprint("No Git client configured (please run lpm configure)", "yellow")
+            elif gitClient != 'GitExtensions':
+                cprint(f"We don't support {gitClient}, are you kidding?", "yellow")
             else:
+                # GitExtensions is configured git client                
+                sourceInfoFilePath = os.path.join(".", "TempObjects", "sourceInfo.json")
+                sourceInfo = getJsonData(sourceInfoFilePath)
                 print(f'Opening {gitClient} for these packages: ' + ', '.join(args.packages))
                 for package in packages:
-                    cmd = []
-                    if(gitClient == 'GitExtensions'):
+                    repoPath = sourceInfo.get(package, {}).get("repoPath", None)
+                    if repoPath is not None:
+                        cmd = []
                         cmd.append('gitex.cmd')
                         cmd.append('openrepo')
-                        cmd.append('\"' + os.path.join(os.getcwd(), 'Logical', 'Libraries', 'Loupe', os.path.split(package)[1]) + '\"')
+                        cmd.append('\"' + os.path.join(os.getcwd(), repoPath) + '\"')
                         executeAndContinue(cmd)
                     else:
-                        cprint(f"We don't support {gitClient}, are you kidding?", "yellow")
+                        cprint(f"Could not find repo location for {package}. Verify that it is installed as source.", "yellow")
 
         # Publish a binary library.
         elif(args.cmd == 'publish'):
@@ -631,41 +610,159 @@ def uninstallPackages(packages):
         command.append(item)
     execute(command, False)
 
-# Install source library by cloning into Logical / Libraries / Loupe folder. 
-def installSource(package, version, loupePkg):
+# Install lpm package source by cloning package's repo folder 
+def installSource(package, version, sourceDependencies=[]):
     # Package names are forced to lower case by convention
     package = package.lower()
-    # The assumption here is that the repo has all of its assets at the root level.
-    # Check to make sure this library isn't already in there.
-    if (os.path.isdir(os.path.join('.', 'Logical', 'Libraries', 'Loupe', package))):
-        raise Exception("Library folder already exists")
-        return
+    repoName = getRepoName(package)
+    repoPath = os.path.join('.', 'TempObjects', repoName)
     try:
-        # Record the current directory.
-        cwd = os.getcwd()
-        # Grab the required credentials for inline cloning.
-        username = getAuthenticatedUser()
-        password = getLocalToken()
-        # Clone the repo into the target directory.
-        libraryPath = os.path.join('.', 'Logical', 'Libraries', 'Loupe', package)
-        command1 = []
-        command1.append('git clone')
-        command1.append(f'https://{username}:{password}@github.com/loupeteam/{package}')
-        command1.append(libraryPath)
-        execute(command1, False)
+        if not os.path.isdir(repoPath):
+            # Grab the required credentials for inline cloning.
+            username = getAuthenticatedUser()
+            password = getLocalToken()
+            # Clone the repo into the target directory.
+            command1 = []
+            command1.append('git clone')
+            command1.append(f'https://{username}:{password}@github.com/loupeteam/{repoName}')
+            command1.append(repoPath)
+            execute(command1, False)
+        else:
+            # Folder exists already.
+            if '.git' in os.listdir(repoPath):
+                print(f"Repository for package {package} already exists. Cloning skipped.")
+            else:
+                raise Exception(f"{package} repository folder \"{repoName}\" exists, but does not contain expected structure.")
+
         # And then checkout the correct commit if it's been specified.
         if (version != ''):
-            os.chdir(os.path.join('.', libraryPath))
             command1b = []
-            command1b.append('git checkout')
+            command1b.append(f'git -C {repoPath} checkout')
             command1b.append(version)
             execute(command1b, False)
-            os.chdir(cwd)
-        # Now add the new directory to the parent's .pkg.
-        loupePkg._addPkgObject(libraryPath)
 
+        # Retrieve package source location via repo's Jenkinsfile
+        packageSourcePath = getPackageSourcePathFromRepoPackage(repoPath, package)
+
+        # Get lpm package type from package.json data
+        packageType = getPackageType(packageSourcePath)
+
+        # Install according to specifics of package type
+        if packageType in ['library']:
+            packageDestination = './Logical/Libraries/Loupe'
+            createPackageTree(packageDestination)
+        elif packageType in ['program', 'package']:
+            # Get AS package for destination
+            packageManifest = os.path.join(packageSourcePath, 'package.json')
+            packageDestination = getPackageDestination(packageManifest)
+        else:
+            raise Exception("Unsupported LPM package type. Cannot install as source.")
+
+        # Add the new directory to the parent's .pkg as a reference.
+        targetAsPackage = ASTools.Package(packageDestination)
+        targetAsPackage._addPkgObject(packageSourcePath, reference=True)
+
+        if packageType in ['library']:
+            packageSourceDependencies = getLibrarySourceDependencies(packageSourcePath)
+        elif packageType in ['program', 'package']:
+            packageSourceDependencies = getProgramSourceDependencies(packageSourcePath)
+        
+        if (len(packageSourceDependencies) > 0):
+            # TODO: add support for getting the correct version of these dependencies.
+            installPackages(packageSourceDependencies, [''] * len(packageSourceDependencies))
+            # Aaand sync those dependencies.
+            syncPackages(getAllDependencies(packageSourceDependencies))
+
+        # add to source dependencies list and remove duplicates
+        sourceDependencies += getAllDependencies(packageSourceDependencies)
+        sourceDependencies = list(set(sourceDependencies))
+
+        # save sourceInfo in json
+        sourceInfoFilePath = os.path.join(".", "TempObjects", "sourceInfo.json")
+        sourceInfo = getJsonData(sourceInfoFilePath)
+        sourceInfo[package] = {}
+        sourceInfo[package]["repoPath"] = repoPath
+        sourceInfo[package]["packageSourcePath"] = packageSourcePath
+        sourceInfo[package]['logicalPath'] = os.path.join(packageDestination, os.path.normpath(packageSourcePath).split(os.sep)[-1])
+        saveJsonData(sourceInfo, sourceInfoFilePath)
     except:
         raise Exception("Error cloning the repo")
+
+# Get destination of LPM package using manifest, defaulting if unspecified
+def getPackageDestination(packageManifestPath):
+    manifestPackageDestination = getPackageManifestField(packageManifestPath, ['lpm', 'logical', 'destination'])
+    # If an explicit destination exists, use that. Otherwise default to Logical root.
+    if manifestPackageDestination != None:
+        packageDestination = os.path.join('Logical', manifestPackageDestination)
+    else: 
+        packageDestination = 'Logical'
+    createPackageTree(packageDestination)
+    return packageDestination
+
+# Get package source paths from Jenkinsfile
+def getPackageSourcePaths(repoPath):
+    jenkinsfilePath = os.path.join(repoPath, 'Jenkinsfile')
+    if os.path.exists(jenkinsfilePath):
+        with open(jenkinsfilePath) as j:
+            rePackagesToPublishArrayContents = r"packagesToPublish\s*:\s*\[(.*)\]"
+            for line in j:
+                match = re.search(rePackagesToPublishArrayContents, line)
+                if match:
+                    arrayContents = match.group(1)
+                    reArrayElement = r"\b[\w\\\/]+\b"
+                    matches = re.findall(reArrayElement, arrayContents)
+                    packageSourcePaths = []
+                    for match in matches:
+                        packageSourcePaths.append(os.path.join(repoPath, os.path.normpath(match)))
+                    return packageSourcePaths
+        
+        # default, return empty array
+        return []
+    else:
+        return []
+
+# Given a repo and a package name, find the package source paths and return the one that either
+#   contains a package.json file with the right "name" value
+#   OR the last folder matches the name and the folder contains a .lby file
+# This function helps resolve the path in the case that a repo has multiple packages (e.g a library and a prog)
+def getPackageSourcePathFromRepoPackage(repoPath, packageName: str):
+    packageSourcePaths = getPackageSourcePaths(repoPath)
+    for path in packageSourcePaths:
+        packageJson = os.path.join(path, 'package.json')
+        if os.path.exists(packageJson):
+            with open(packageJson) as p:
+                data = json.load(p)
+                if packageName.lower() == data.get("name", "").lower():
+                    return path
+        else:
+            splitPath = os.path.normpath(path).split(os.sep)
+            basePackageName = os.path.split(packageName)[1]
+            if splitPath[-1].lower() == basePackageName:
+                for file in os.listdir(path):
+                    (root, ext) = os.path.splitext(file)
+                    if ext == '.lby':
+                        return path
+
+def getJsonData(jsonFilePath):
+    # Create file only if it doesn't already exist
+    try:
+        with open(jsonFilePath, 'x'):
+            pass
+    except FileExistsError:
+        pass
+
+    with open(jsonFilePath, 'r+') as fp:
+        # Load to dictionary
+        try:
+            data = json.load(fp)
+        except:
+            data = {}
+    
+    return data
+
+def saveJsonData(data: dict, jsonFilePath):
+    with open(jsonFilePath, 'w') as fp:
+        json.dump(data, fp, indent=2)
 
 def openDocumentation(packages):
     command = []
@@ -696,6 +793,21 @@ def readLoupeLibraryList():
         return
     return libraryList
 
+# Retrieves repo name of a package by fetching data from GitHub
+def getRepoName(package):
+    (error, data) = getLoupePackageData(package)
+    if error is None:
+        fullUrl = data.get('repository', {}).get('html_url', None)
+        if fullUrl is None:
+            print("Unable to process package data")
+            return None
+        # Return final folder of URL
+        repoName = fullUrl.split('/')[-1]
+        return repoName
+    else:
+        print(error)
+        return None
+
 # Retrieve a deep list of all dependencies of the specified packages.
 # This is recursive logic that hurts my brain, but seems to work. 
 def getAllDependencies(packages):
@@ -718,7 +830,7 @@ def getAllDependencies(packages):
         else:
             # Strip it of its @loupeteam prefix.
             splitPackage = os.path.split(package)[1]
-            dependencyData = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', splitPackage))
+            dependencyData = getLibrarySourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', splitPackage))
             print('Source dependencies: ')
             print(dependencyData)
         localDependencies = []
@@ -735,7 +847,7 @@ def getAllDependencies(packages):
             sanitizedDependencies.append( lowerdep )
     return sanitizedDependencies
 
-def getSourceDependencies(libraryPath):
+def getLibrarySourceDependencies(libraryPath):
     sourceLibrary = ASTools.Library(libraryPath)
     dependencyNames = []
     # Install binary dependencies for this library
@@ -749,6 +861,14 @@ def getSourceDependencies(libraryPath):
             print('Dependency found: ' + f'@loupeteam/{dependency.name.lower()}')
             # Add this dependency to our list.
             dependencyNames.append(f'@loupeteam/{dependency.name}'.lower())
+    return dependencyNames
+
+def getProgramSourceDependencies(programSourcePath):
+    dependencyData = getPackageManifestField(os.path.join(programSourcePath, 'package.json'), ['dependencies'])
+    dependencyNames = []
+    for key, value in dependencyData.items():
+        print('Dependency found: ' + str(key))
+        dependencyNames.append(key)
     return dependencyNames
 
 # Synchronize a package from the node_modules folder into the appropriate directory. 
@@ -776,14 +896,7 @@ def syncPackages(packages):
             pass
 
         elif((packageType == 'program') | (packageType == 'package')):
-            packageDestination = getPackageManifestField(packageManifest, ['lpm', 'logical', 'destination'])
-            # If an explicit destination exists, use that. Otherwise default to Logical root.
-            if packageDestination != None:
-                destination = os.path.join('Logical', packageDestination)
-                # Now create the packages in this path that doesn't exist.
-                createPackageTree(destination)
-            else:
-                destination = 'Logical'
+            destination = getPackageDestination(packageManifest)
             # Find the module(s) in node_modules, and sync it/them.
             for module in os.listdir(os.path.join('node_modules', '@loupeteam')):
                 if (os.path.join('@loupeteam', module) == os.path.normpath(package)):
@@ -856,13 +969,30 @@ def deployPackages(config, packages):
                     configPackage.setPreBuildStep(preBuildCommand)
                     
         # No package.json is present in node_modules - so it's a source library. 
-        else:
-            # Introspect the package.json for this package. Find its 'lpm' section.
-            packageManifest = os.path.join('Logical', 'Libraries', 'Loupe', os.path.split(package)[1], 'package.json')
-            libraryAttributes = getLibraryAttributes(packageManifest, config)
-            libraryLocation = os.path.join('Libraries', 'Loupe')
-            # Deploy the required library.
-            deploymentTable.deployLibrary(os.path.join('Logical', libraryLocation), os.path.split(package)[1], libraryAttributes)
+        else:     
+            sourceInfoFilePath = os.path.join(".", "TempObjects", "sourceInfo.json")
+            sourceInfo = getJsonData(sourceInfoFilePath)
+            packageSourceInfo = sourceInfo[package]
+            packageManifest = os.path.join(packageSourceInfo['packageSourcePath'], 'package.json')
+            packageType = getPackageType(packageSourceInfo['packageSourcePath'])
+            if packageType in ['library']:
+                libraryLocation = os.path.join('Libraries', 'Loupe')
+                libraryAttributes = getLibraryAttributes(packageManifest, config)
+                # Deploy the required library.
+                deploymentTable.deployLibrary(os.path.join('Logical', libraryLocation), os.path.split(package)[1], libraryAttributes)
+            elif packageType in ['program', 'package']:
+                sourceInfoFilePath = os.path.join(".", "TempObjects", "sourceInfo.json")
+                sourceInfo = getJsonData(sourceInfoFilePath)
+                packageSourceInfo = sourceInfo[package]
+                cpuDeployment = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
+
+                logicalPackagePath = os.path.normpath(packageSourceInfo['logicalPath'])
+                if "Logical" in logicalPackagePath.split('\\')[0]:
+                    logicalPackagePath = os.path.normpath('\\'.join(logicalPackagePath.split('\\')[1:]))
+
+                if cpuDeployment != None:
+                    for item in cpuDeployment:
+                        deploymentTable.deployTask(logicalPackagePath, item['source'], item['destination'])
 
 def getLibraryAttributes(packageManifest, config):
     libraryCpus = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
@@ -948,7 +1078,7 @@ def createLibraryManifest(package, lpmConfig):
                 }
     # Convert to JSON and create the file
     manifest_json = json.dumps(manifest_dict, indent=2)
-    f = open('.\package.json', 'w')
+    f = open('.\\package.json', 'w')
     f.write(manifest_json)
     f.close()
     return
@@ -1029,7 +1159,7 @@ def getLoupePackageListData():
                     'per_page': str(per_page) }
         r = requests.get(f'https://api.github.com/orgs/{organization}/packages', headers=headers, params=params, timeout=5)
         if r.status_code != 200:
-            error = "Status code not OK. Code: " + r.status_code + "\n" + r.text 
+            error = "Status code not OK. Code: " + str(r.status_code) + "\n" + r.text 
             return (error, [])  # Early return
         retrieved_packages = json.loads(r.content)
         all_packages += retrieved_packages
@@ -1038,6 +1168,23 @@ def getLoupePackageListData():
 
     print(f"Retrieved {len(all_packages)} packages total. See below for detailed information.")
     return (None, all_packages)
+
+# Fetches data using GitHub API (See https://docs.github.com/en/rest/packages?apiVersion=2022-11-28#list-packages-for-an-organization)
+# Returns (error, data) tuple, where error is None if all OK and data is a dictionary of the desired package (see GitHub's schema)
+def getLoupePackageData(packageName: str):
+    token = getLocalToken()
+    headers = { 'Authorization': f'Bearer {token}',
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28' }
+    organization = 'loupeteam'
+
+    packageNameStripped = os.path.split(packageName)[1] # Strip it of its @loupeteam prefix.
+    r = requests.get(f'https://api.github.com/orgs/{organization}/packages/npm/{packageNameStripped}', headers=headers, timeout=5)
+    if r.status_code != 200:
+        error = "Status code not OK. Code: " + str(r.status_code) + "\n" + r.text 
+        return (error, [])  # Early return
+    packageData = json.loads(r.content)
+    return (None, packageData)
 
 # Run a generic NPM command on the specified packages.
 def runGenericNpmCmd(cmd, packages):
