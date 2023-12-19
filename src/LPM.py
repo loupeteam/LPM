@@ -23,7 +23,8 @@ import ctypes
 import time
 import requests
 
-with open("version.json", "r") as f:
+version_file = os.path.join(os.path.dirname(sys.argv[0]), 'version.json')
+with open(version_file, "r") as f:
     data = json.load(f)
     __version__ = data["version"]
 

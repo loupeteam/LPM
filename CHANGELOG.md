@@ -1,5 +1,7 @@
 # Change log
 
+- 1.0.3 - Address bug related to version file path
+
 - 1.0.2 - Improve robustness of viewall command
 
 - 1.0.1 - Replace all webHMI references with Loupe UX
