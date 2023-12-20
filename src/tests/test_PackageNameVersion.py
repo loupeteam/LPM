@@ -41,7 +41,7 @@ class Test_PackageNameVersion:
             p = PackageNameVersion(i)
             assert p.getBaseName() == "atn"
             assert p.getFullName() == "@loupeteam/atn"
-            assert p.getVersion() == "v3.1.0"
+            assert p.getVersion() == "3.1.0"
 
     def test_versionLeadingZeros(self):
         # Leading zeros are not truncated 
@@ -49,7 +49,7 @@ class Test_PackageNameVersion:
         p = PackageNameVersion("atn@v03.01.00")
         assert p.getBaseName() == "atn"
         assert p.getFullName() == "@loupeteam/atn"
-        assert p.getVersion() == "v03.01.00"
+        assert p.getVersion() == "03.01.00"
 
     def test_invalidInputs(self):
         # Invalid inputs

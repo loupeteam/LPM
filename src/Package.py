@@ -16,6 +16,6 @@ class PackageNameVersion:
     
     def getVersion(self):
         if self.versionText != '':
-            return f"v{self.versionText}"
+            return self.versionText
         else:
             return ''
