@@ -2,23 +2,12 @@ import re
 
 class PackageNameVersion:
     def __init__(self, input: str):
-
-        # Extract text after optional org prefix
-        reOrgPrefix = r"^(@loupeteam[\\\/])?([\w@\.]+)$"
-        match = re.search(reOrgPrefix, input, re.IGNORECASE)
+        reValidInput = r"^(@loupeteam[\\\/])?(\w+)@?(@v?(\d+\.\d+\.\d+))?$"
+        match = re.search(reValidInput, input, re.IGNORECASE)
         if not match: raise ValueError
-        inputWithoutOrg = match.group(2)
-        
-        # Extract package name and optional version
-        rePackageAndVersion = r"^(\w+)@?(@v?(\d+\.\d+\.\d+))?$"
-        match = re.search(rePackageAndVersion, inputWithoutOrg, re.IGNORECASE)
-        if not match: raise ValueError
-        self.baseName = match.group(1).lower()
-        if match.group(3) is not None:
-            self.versionText = match.group(3)
-        else:
-            self.versionText = ''  
-
+        self.baseName = match.group(2).lower()
+        self.versionText = match.group(4) if match.group(4) is not None else ''
+    
     def getBaseName(self):
         return f"{self.baseName}"
     
