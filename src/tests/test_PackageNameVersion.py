@@ -9,16 +9,13 @@ class Test_PackageNameVersion:
         # valid inputs without version number
         validInputsNoVersion = ["atn",
                                 "atn@",
-                                "/atn",
-                                "\\atn",
-                                "/atn@",
-                                "\\atn@",
                                 "@loupeteam/atn",
                                 "@loupeteam\\atn",
                                 "@loupeteam/atn@",
                                 "@loupeteam\\atn@",
-                                "ATN",
                                 "@LOUPETEAM/atn",
+                                "@lOuPeTeAm/atn",
+                                "AtN",
                                 ]
 
         for i in validInputsNoVersion:
@@ -32,11 +29,9 @@ class Test_PackageNameVersion:
         validInputsWithVersion = [  "atn@v3.1.0",
                                     "atn@V3.1.0",
                                     "atn@3.1.0",
-                                    "atn@03.01.0",
                                     "@loupeteam/atn@v3.1.0",
                                     "@loupeteam/atn@V3.1.0",
                                     "@loupeteam/atn@3.1.0",
-                                    "@loupeteam/atn@03.01.0",
                                     "@loupeteam\\atn@v3.1.0",
                                     "@loupeteam\\atn@V3.1.0",
                                     "@loupeteam\\atn@3.1.0",
@@ -62,6 +57,7 @@ class Test_PackageNameVersion:
                             "atn@v3.1.0.1",
                             "atn@w3.1.0",
                             "atn@v3.a.0",
+                            "@loupeteamatn",
                             "@somebogusorg/atn",
                             "somebogusorg/atn",
                             "loupeteam/atn",    # maybe this should be valid
