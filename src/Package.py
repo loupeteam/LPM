@@ -5,17 +5,20 @@ class PackageNameVersion:
         reValidInput = r"^(@loupeteam[\\\/])?(\w+)@?(@v?(\d+\.\d+\.\d+))?$"
         match = re.search(reValidInput, input, re.IGNORECASE)
         if not match: raise ValueError
-        self.baseName = match.group(2).lower()
-        self.versionText = match.group(4) if match.group(4) is not None else ''
+        self._baseName = match.group(2).lower()
+        self._versionText = match.group(4) if match.group(4) is not None else ''
     
-    def getBaseName(self):
-        return f"{self.baseName}"
+    @property
+    def baseName(self):
+        return f"{self._baseName}"
     
-    def getFullName(self):
-        return f"@loupeteam/{self.baseName}"
+    @property
+    def fullName(self):
+        return f"@loupeteam/{self._baseName}"
     
-    def getVersion(self):
-        if self.versionText != '':
-            return self.versionText
+    @property
+    def version(self):
+        if self._versionText != '':
+            return self._versionText
         else:
             return ''

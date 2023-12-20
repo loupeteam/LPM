@@ -20,9 +20,9 @@ class Test_PackageNameVersion:
 
         for i in validInputsNoVersion:
             p = PackageNameVersion(i)
-            assert p.getBaseName() == "atn"
-            assert p.getFullName() == "@loupeteam/atn"
-            assert p.getVersion() == ""
+            assert p.baseName == "atn"
+            assert p.fullName == "@loupeteam/atn"
+            assert p.version == ""
 
     def test_validInputsWithVersion(self):
         # Valid inputs with version number
@@ -39,17 +39,17 @@ class Test_PackageNameVersion:
         
         for i in validInputsWithVersion:
             p = PackageNameVersion(i)
-            assert p.getBaseName() == "atn"
-            assert p.getFullName() == "@loupeteam/atn"
-            assert p.getVersion() == "3.1.0"
+            assert p.baseName == "atn"
+            assert p.fullName == "@loupeteam/atn"
+            assert p.version == "3.1.0"
 
     def test_versionLeadingZeros(self):
         # Leading zeros are not truncated 
         # (though its debatable whether we want to parse to integer)
         p = PackageNameVersion("atn@v03.01.00")
-        assert p.getBaseName() == "atn"
-        assert p.getFullName() == "@loupeteam/atn"
-        assert p.getVersion() == "03.01.00"
+        assert p.baseName == "atn"
+        assert p.fullName == "@loupeteam/atn"
+        assert p.version == "03.01.00"
 
     def test_invalidInputs(self):
         # Invalid inputs

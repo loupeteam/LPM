@@ -77,9 +77,9 @@ def main():
         # Return if no valid packages
         if len(packageNameObjectList) == 0:
             return
-    packagesFullNames =  [p.getFullName()    for p in packageNameObjectList]  
-    packagesBaseNames =  [p.getBaseName()    for p in packageNameObjectList]  
-    packagesVersions  =  [p.getVersion()     for p in packageNameObjectList]    
+    packagesFullNames =  [p.fullName    for p in packageNameObjectList]  
+    packagesBaseNames =  [p.baseName    for p in packageNameObjectList]  
+    packagesVersions  =  [p.version     for p in packageNameObjectList]    
 
     # Authenticate with a custom personal access token. 
     if(args.cmd == 'login'):
@@ -141,11 +141,11 @@ def main():
         # View information about a package. 
         elif(args.cmd == 'view') | (args.cmd == 'info'):
             if (len(args.packages) > 1):
-                packageFullName = Package.PackageNameVersion(args.packages[0]).getFullName()
+                packageFullName = Package.PackageNameVersion(args.packages[0]).fullName
                 options = args.packages[1:]
                 getInfo(packageFullName, options)
             elif (len(args.packages) > 0):
-                packageFullName = Package.PackageNameVersion(args.packages[0]).getFullName()
+                packageFullName = Package.PackageNameVersion(args.packages[0]).fullName
                 options = []
                 getInfo(packageFullName, options)
             else:
@@ -471,7 +471,7 @@ def importLibraries():
     packages_to_import = []
     package_versions_to_import = []
     for library in loupePkg.objects:
-        packageFullName = Package.PackageNameVersion(library.text).getFullName()    # Adds organization prefix
+        packageFullName = Package.PackageNameVersion(library.text).fullName    # Adds organization prefix
         packages_to_import.append(packageFullName)
         package_versions_to_import.append(library.version)
     # Install them.
@@ -715,7 +715,7 @@ def getAllDependencies(packages):
         # If there is no package.json for this package, assume it's a source library, and that it's already sync'd
         # to the Logical View under Libraries / Loupe.
         else:
-            packageBaseName = Package.PackageNameVersion(package).getBaseName()
+            packageBaseName = Package.PackageNameVersion(package).baseName
             dependencyData = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', packageBaseName))
             print('Source dependencies: ')
             print(dependencyData)
