@@ -952,7 +952,7 @@ def createLibraryManifest(package, lpmConfig):
                 }
     # Convert to JSON and create the file
     manifest_json = json.dumps(manifest_dict, indent=2)
-    f = open('.\package.json', 'w')
+    f = open('.\\package.json', 'w')
     f.write(manifest_json)
     f.close()
     return
