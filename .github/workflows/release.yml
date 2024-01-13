@@ -20,10 +20,8 @@ jobs:
         run: |
           ./BuildInstaller.bat
       - name: Code Signing Setup - Setup Certificate 
-        run: | 
-          echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12 
-          cat /d/Certificate_pkcs12.p12 
-        shell: bash   
+        run: echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12 
+        shell: bash
       - name: Code Signing Setup - Set variables 
         id: variables 
         run: | 
