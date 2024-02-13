@@ -1,57 +1,68 @@
 name: LPM Installer Publish
-run-name: LPM Installer Publish     
+run-name: Publish LPM Installer ${{ github.ref_name }}
+
 on:
   push:
     tags:
-      - '*'
+      - v*
+
 jobs:
-  Explore-GitHub-Actions:
-    runs-on: windows-latest
+  release-installer:
+    runs-on: windows-2022
+    timeout-minutes: 2
+    env:
+      SM_API_KEY: ${{ secrets.SM_API_KEY }}
+      SM_CLIENT_CERT_FILE: "D:\\Certificate_pkcs12.p12"
+      SM_CLIENT_CERT_PASSWORD: ${{ secrets.SM_CLIENT_CERT_PASSWORD }}
+      SM_HOST: ${{ secrets.SM_HOST }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
           submodules: true
           token: ${{ secrets.GH_LPM_ASPYTHON_TOKEN }}
+
       - name: Download + Install Inno
         uses: pwall2222/inno-setup-download@v0.0.4
+
       - name: Create the EXE Installer
         working-directory: ./utils
+        run: ./BuildInstaller.bat
+
+      - name: Code Signing Setup - Setup Certificate
+        shell: bash
+        run: echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
+
+      - name: Code Signing Setup - add to path
+        shell: bash
         run: |
-          ./BuildInstaller.bat
-      - name: Code Signing Setup - Setup Certificate 
-        run: echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12 
-        shell: bash
-      - name: Code Signing Setup - Set variables 
-        id: variables 
-        run: | 
-          echo "::set-output name=version::${GITHUB_REF#refs/tags/v}" 
-          echo "SM_HOST=${{ secrets.SM_HOST }}" >> "$GITHUB_ENV" 
-          echo "SM_API_KEY=${{ secrets.SM_API_KEY }}" >> "$GITHUB_ENV" 
-          echo "SM_CLIENT_CERT_FILE=D:\\Certificate_pkcs12.p12" >> "$GITHUB_ENV" 
-          echo "SM_CLIENT_CERT_PASSWORD=${{ secrets.SM_CLIENT_CERT_PASSWORD }}" >> "$GITHUB_ENV" 
-          echo "C:\Program Files (x86)\Windows Kits\10\App Certification Kit" >> $GITHUB_PATH 
-          echo "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools" >> $GITHUB_PATH 
-          echo "C:\Program Files\DigiCert\DigiCert One Signing Manager Tools" >> $GITHUB_PATH 
-        shell: bash
-      - name: Code Signing Setup - Setup SSM KSP on windows latest 
-        run: | 
-          curl -X GET  https://one.digicert.com/signingmanager/api-ui/v1/releases/smtools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o smtools-windows-x64.msi 
-          msiexec /i smtools-windows-x64.msi /quiet /qn 
-          smksp_registrar.exe list 
-          smctl.exe keypair ls 
-          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user 
-          smksp_cert_sync.exe 
-        shell: cmd 
-      - name: Code Signing Setup - Sign using Signtool 
-        run: | 
-          signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "./build/LPM-Setup.exe" 
-          signtool.exe verify /v /pa "./build/LPM-Setup.exe"    
+          echo "C:\Program Files (x86)\Windows Kits\10\App Certification Kit" >> $GITHUB_PATH
+          echo "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools" >> $GITHUB_PATH
+          echo "C:\Program Files\DigiCert\DigiCert One Signing Manager Tools" >> $GITHUB_PATH
+
+      - name: Code Signing Setup - Setup SSM KSP on windows latest
+        shell: cmd
+        run: |
+          curl -X GET https://one.digicert.com/signingmanager/api-ui/v1/releases/smtools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o smtools-windows-x64.msi
+          msiexec /i smtools-windows-x64.msi /quiet /qn
+          smksp_registrar.exe list
+          smctl.exe keypair ls
+          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
+          smksp_cert_sync.exe
+
+      - name: Code Signing Setup - Sign using Signtool
+        run: |
+          signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "./build/LPM-Setup.exe"
+          signtool.exe verify /v /pa "./build/LPM-Setup.exe"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: us-west-2
+          aws-access-key-id: ${{ secrets.LPM_S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.LPM_S3_SECRET_ACCESS_KEY }}
+
       - name: Upload Installer to S3
         run: |
-          aws configure set aws_access_key_id ${{ secrets.LPM_S3_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.LPM_S3_SECRET_ACCESS_KEY }}
-          aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/latest/LPM-Setup.exe --region us-west-2
-          aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/${{ github.ref_name }}/LPM-Setup.exe --region us-west-2
-
-
+          aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/latest/LPM-Setup.exe
+          aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/${{ github.ref_name }}/LPM-Setup.exe
