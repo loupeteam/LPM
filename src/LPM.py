@@ -23,6 +23,8 @@ import ctypes
 import time
 import requests
 
+import Package
+
 version_file = os.path.join(os.path.dirname(sys.argv[0]), 'version.json')
 with open(version_file, "r") as f:
     data = json.load(f)
@@ -63,22 +65,21 @@ def main():
         def cprint(text, color):
             print(text)
 
-    # Prepend the @loupeteam prefix to all package names, and split any @version suffixes off into separate struct.
-    packages = []
-    packageVersions = []
+    # Build array of PackageNameVersion objects from args
+    packageNameObjectList = []
     if(args.packages):   
         for item in args.packages:
-            # Force package name to lowercase, by convention
-            item = item.lower()
-            # If the @ character is present, it means there's a version specifier.
-            if('@' in item):
-                splitItem = item.split('@')
-                packages.append('@loupeteam/' + splitItem[0])
-                packageVersions.append(splitItem[1])
-            # Othersie, version string is empty.
-            else:
-                packages.append('@loupeteam/' + item)
-                packageVersions.append('')
+            try:
+                packageNameObjectList.append(Package.PackageNameVersion(item))
+            except:
+                print(colored(f'Could not interpret \"{item}\" as a valid package', 'red'))
+        
+        # Return if no valid packages
+        if len(packageNameObjectList) == 0:
+            return
+    packagesFullNames =  [p.fullName    for p in packageNameObjectList]  
+    packagesBaseNames =  [p.baseName    for p in packageNameObjectList]  
+    packagesVersions  =  [p.version     for p in packageNameObjectList]    
 
     # Authenticate with a custom personal access token. 
     if(args.cmd == 'login'):
@@ -140,11 +141,13 @@ def main():
         # View information about a package. 
         elif(args.cmd == 'view') | (args.cmd == 'info'):
             if (len(args.packages) > 1):
+                packageFullName = Package.PackageNameVersion(args.packages[0]).fullName
                 options = args.packages[1:]
-                getInfo(packages[0], options)
+                getInfo(packageFullName, options)
             elif (len(args.packages) > 0):
+                packageFullName = Package.PackageNameVersion(args.packages[0]).fullName
                 options = []
-                getInfo(packages[0], options)
+                getInfo(packageFullName, options)
             else:
                 print(colored('Please provide the name of one package.', 'yellow'))
 
@@ -154,16 +157,16 @@ def main():
 
         # Retrieve the type of a package (or directory). 
         elif(args.cmd == 'type'):
-            if (len(packages) > 1):
+            if (len(packagesFullNames) > 1):
                 print(colored('This command is only supported with a single package.', 'yellow'))
             else:
                 print(getPackageType(args.packages[0]))
 
         # Open up documentation page for the library.
         elif(args.cmd == 'docs'):
-            if (len(packages) > 0):
-                print('Opening up documentation for ' + ', '.join(packages) + '...')
-                openDocumentation(packages)
+            if (len(packagesFullNames) > 0):
+                print('Opening up documentation for ' + ', '.join(packagesFullNames) + '...')
+                openDocumentation(packagesFullNames)
                 print(colored('Documentation is now up in your browser.', 'green'))
             else:
                 print(colored('Please provide the name of at least one package.', 'yellow'))
@@ -267,25 +270,25 @@ def main():
         elif(args.cmd == 'install'):
             # Handle default scenario where sources are not requested (i.e. we're installing binary packages).
             if (not args.source):
-                if (len(packages) > 0):
-                    print('Installing ' + ', '.join(packages) + '...')
+                if (len(packagesFullNames) > 0):
+                    print('Installing ' + ', '.join(packagesFullNames) + '...')
                     try:
-                        installPackages(packages, packageVersions)
+                        installPackages(packagesFullNames, packagesVersions)
                     except:
                         cprint('Error while attempting to install package(s).', 'yellow')
                         return
                 else:
                     print('Installing all dependencies...')
                     try:
-                        installPackages(packages, packageVersions)
+                        installPackages(packagesFullNames, packagesVersions)
                     except:
                         cprint('Error while attempting to install package(s).', 'yellow')
                         return
                 # Move packages from the node_modules folder into the project/main directory. 
-                syncPackages(getAllDependencies(packages))
+                syncPackages(getAllDependencies(packagesFullNames))
             else: # Handle request to install source code instead.
-                if (len(packages) > 0):
-                    print('Cloning ' + ', '.join(args.packages) + '...')
+                if (len(packageNameObjectList) > 0):
+                    print('Cloning ' + ', '.join(packagesBaseNames) + '...')
                     try:
                         # First check to see if there is an AS project locally.
                         project = ASTools.Project('.')
@@ -297,19 +300,10 @@ def main():
                             print('Loupe folder not found, creating it...')
                             # Add the Loupe package back in there.
                             loupePkg = librariesPkg.addEmptyPackage('Loupe') 
-                        for package in args.packages:
-                            # Extract version info if included (this would show up after the '@' character, i.e. 'mylib@3.0.4')
-                            # TODO: this check is now redundant with a version check done at the top of this file, so this should get refactored...
-                            if package.find('@') > -1:
-                                splitPackage = package.split('@')
-                                packageName = splitPackage[0]
-                                packageVersion = splitPackage[1]
-                                installSource(packageName, packageVersion, loupePkg)                               
-                            else:
-                                packageName = package
-                                installSource(packageName, '', loupePkg)
+                        for (packageFullName, packageBaseName, version) in zip(packagesFullNames, packagesBaseNames, packagesVersions):
+                            installSource(packageFullName, version, loupePkg)
                             # Next, install any dependencies of this source library.
-                            sourceDependencies = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', packageName))
+                            sourceDependencies = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', packageBaseName))
                             if (len(sourceDependencies) > 0):
                                 # TODO: add support for getting the correct version of these dependencies.
                                 installPackages(sourceDependencies, [''] * len(sourceDependencies))
@@ -322,18 +316,18 @@ def main():
             # First check project-level settings to see if deployment is configured. 
             deploymentConfigs = getPackageManifestField('package.json', ['lpmConfig', 'deploymentConfigs'])
             if (deploymentConfigs is not None):
-                print('Deploying ' + ', '.join(packages) + ' to the following configurations: ' + ', '.join(deploymentConfigs))
+                print('Deploying ' + ', '.join(packagesFullNames) + ' to the following configurations: ' + ', '.join(deploymentConfigs))
                 for config in deploymentConfigs:
                     if(not args.source):
-                        deployPackages(config, getAllDependencies(packages))
+                        deployPackages(config, getAllDependencies(packagesFullNames))
                     else:
                         # TODO: this split below may not be necessary, TBD.
                         # For case of source, deploy the source first. 
-                        deployPackages(config, packages)
+                        deployPackages(config, packagesFullNames)
                         # Then deploy all of its dependencies.
                         deployPackages(config, sourceDependencies)
             cprint('Operation completed successfully.', 'green')
-            for package in packages:
+            for package in packagesFullNames:
                 packageManifestPath = os.path.join('node_modules', package, 'package.json')
                 if(os.path.exists(packageManifestPath)):
                     packageType = getPackageManifestField(packageManifestPath, ['lpm', 'type'])
@@ -345,14 +339,14 @@ def main():
 
         # Uninstall one or more packages.
         elif(args.cmd == 'uninstall'):
-            if (len(packages) > 0):
-                print('Uninstalling ' + ', '.join(packages) + '...')
+            if (len(packagesFullNames) > 0):
+                print('Uninstalling ' + ', '.join(packagesFullNames) + '...')
                 try:
-                    uninstallPackages(packages)
+                    uninstallPackages(packagesFullNames)
                 except:
                     cprint('Error while attempting to uninstall package(s).', 'yellow')
                     return
-                syncPackages(getAllDependencies(packages))
+                syncPackages(getAllDependencies(packagesFullNames))
                 cprint('Operation completed successfully.', 'green')
             else:
                 print(colored('Please provide the name of at least one package.', 'yellow'))
@@ -364,13 +358,13 @@ def main():
             if(gitClient == ''):
                 cprint("No Git client configured (please run lpm configure)", "yellow")
             else:
-                print(f'Opening {gitClient} for these packages: ' + ', '.join(args.packages))
-                for package in packages:
+                print(f'Opening {gitClient} for these packages: ' + ', '.join(packagesFullNames))
+                for package in packagesBaseNames:
                     cmd = []
                     if(gitClient == 'GitExtensions'):
                         cmd.append('gitex.cmd')
                         cmd.append('openrepo')
-                        cmd.append('\"' + os.path.join(os.getcwd(), 'Logical', 'Libraries', 'Loupe', os.path.split(package)[1]) + '\"')
+                        cmd.append('\"' + os.path.join(os.getcwd(), 'Logical', 'Libraries', 'Loupe', package) + '\"')
                         executeAndContinue(cmd)
                     else:
                         cprint(f"We don't support {gitClient}, are you kidding?", "yellow")
@@ -417,7 +411,7 @@ def main():
 
         # In all other cases, just pass the command and list of packages straight through to NPM.
         else:
-            runGenericNpmCmd(args.cmd, packages)
+            runGenericNpmCmd(args.cmd, args.packages)
             cprint('Operation completed', 'green')
 
     return
@@ -477,7 +471,8 @@ def importLibraries():
     packages_to_import = []
     package_versions_to_import = []
     for library in loupePkg.objects:
-        packages_to_import.append('@loupeteam/' + library.text)
+        packageFullName = Package.PackageNameVersion(library.text).fullName    # Adds organization prefix
+        packages_to_import.append(packageFullName)
         package_versions_to_import.append(library.version)
     # Install them.
     try:
@@ -615,12 +610,12 @@ def getPackageType(path):
         return packageType
 
 # Perform the NPM install. 
-def installPackages(packages, packageVersions):
+def installPackages(packages, packagesVersions):
     command = []
     command.append('npm install')
     # force packages names to lowercase
     packages = [package.lower() for package in packages]
-    for (item, version) in zip(packages, packageVersions):
+    for (item, version) in zip(packages, packagesVersions):
         if(version != ''):
             command.append(f'{item}@{version}')
         else:
@@ -720,9 +715,8 @@ def getAllDependencies(packages):
         # If there is no package.json for this package, assume it's a source library, and that it's already sync'd
         # to the Logical View under Libraries / Loupe.
         else:
-            # Strip it of its @loupeteam prefix.
-            splitPackage = os.path.split(package)[1]
-            dependencyData = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', splitPackage))
+            packageBaseName = Package.PackageNameVersion(package).baseName
+            dependencyData = getSourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', packageBaseName))
             print('Source dependencies: ')
             print(dependencyData)
         localDependencies = []
