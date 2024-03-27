@@ -8,7 +8,7 @@ info@loupe.team
 1-800-240-7042
 
 ## Installation
-Install LPM by downloading the latest version of the installer [here](https://loupe-lpm-assets.s3.us-west-2.amazonaws.com/releases/latest/LPM-Setup.exe). After running the installer, you can run `lpm` commands from your terminal of choice.
+Install LPM by first [installing Python](https://docs.python.org/3/using/windows.html) and [Node](https://nodejs.org/en/download/), then downloading the latest version of the installer [here](https://loupe-lpm-assets.s3.us-west-2.amazonaws.com/releases/latest/LPM-Setup.exe). After running the installer, you can run `lpm` commands from your terminal of choice.
 
 ## Description
 
