@@ -1,6 +1,6 @@
 certifi==2023.5.7
 charset-normalizer==3.3.2
-idna==3.6
+idna==3.7
 inquirerpy==0.3.4
 ordered-set==4.1.0
 pfzy==0.3.4
