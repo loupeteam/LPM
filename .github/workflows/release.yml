@@ -22,8 +22,10 @@ jobs:
           submodules: true
           token: ${{ secrets.GH_LPM_ASPYTHON_TOKEN }}
 
-      - name: Download + Install Inno
-        uses: pwall2222/inno-setup-download@v0.0.4
+      - name: Download Inno Setup installer
+        run: Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "is.exe"
+      - name: Install Inno Setup silently
+        run: .\is.exe /verysilent /dir="C:\Program Files\InnoSetup"
 
       - name: Create the EXE Installer
         working-directory: ./utils
