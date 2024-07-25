@@ -1,5 +1,13 @@
 # Change log
 
+- 1.0.4 - Address SyntaxWarning that pops up in Python 3.12
+
+- 1.0.3 - Address bug related to version file path
+
+- 1.0.2 - Improve robustness of viewall command
+
+- 1.0.1 - Replace all webHMI references with Loupe UX
+
 - 1.0.0 - Public release
 
 - 0.5.3 - Add supporting files in preparation for open-sourcing

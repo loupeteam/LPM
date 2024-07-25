@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "LPM"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.4"
 #define MyAppPublisher "Loupe"
 #define MyAppURL "https://loupe.team/"
 #define MyAppExeName "LPM.cmd"
@@ -41,6 +41,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "..\src\*.py"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\src\LPM.cmd"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\src\version.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
