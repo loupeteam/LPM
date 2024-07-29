@@ -19,33 +19,35 @@ LPM_AS_TEMPLATE_PATH = os.path.join("./test/", LPM_AS_TEMPLATE_FOLDER_NAME)
 
 class TestLpmSrc:
     
-    def setup_method(self, method):
+    @classmethod
+    def setup_class(cls):
         # Code to run before each test method
 
         # Ensure AS Template exists (create if necessary)
-        self.ensure_as_template_exists()
+        cls.ensure_as_template_exists()
 
         # create temporary folder
         now = datetime.now()
         timestamp = now.strftime("%y%m%d-%H-%M-%S")
         test_folder = timestamp
-        self.test_dir = os.path.join("./temp/", test_folder)
+        cls.test_dir = os.path.join("./temp/", test_folder)
 
         # Source directory
         asproject_template_source = LPM_AS_TEMPLATE_PATH
 
         # Copy the entire directory tree, allowing existing destination
-        shutil.copytree(asproject_template_source, self.test_dir, dirs_exist_ok=True)
-        print(f"Copied template to test folder: {self.test_dir}")
+        shutil.copytree(asproject_template_source, cls.test_dir, dirs_exist_ok=True)
+        print(f"Copied template to test folder: {cls.test_dir}")
 
-    def teardown_method(self, method):
+    @classmethod
+    def teardown_class(cls):
         # Code to run after each test method
 
-        # shutil.rmtree(self.test_dir)
+        # shutil.rmtree(cls.test_dir)
         print("Teardown code")
     
-
-    def ensure_as_template_exists(self):
+    @classmethod
+    def ensure_as_template_exists(cls):
         
         # ensure template folder exists
         if not os.path.exists(LPM_AS_TEMPLATE_PATH):
