@@ -982,6 +982,11 @@ def deployPackages(config, packages):
             if packageType in ['library']:
                 libraryLocation = os.path.join('Libraries', 'Loupe')
                 libraryAttributes = getLibraryAttributes(packageManifest, config)
+                
+                # Special case logic: convert AdditionalLibraryDirectories attribute path from logical to actual
+                if "AdditionalLibraryDirectories" in libraryAttributes:
+                    libraryAttributes["AdditionalLibraryDirectories"] = ASTools.getActualPathFromLogicalPath(libraryAttributes["AdditionalLibraryDirectories"])
+
                 # Deploy the required library.
                 deploymentTable.deployLibrary(os.path.join('Logical', libraryLocation), os.path.split(package)[1], libraryAttributes)
             elif packageType in ['program', 'package']:
