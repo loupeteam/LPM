@@ -130,7 +130,7 @@ class TestLpmSrc:
         try:
             project = ASTools.Project(".")
             build_result = project.build("Intel")
-            assert build_result.returncode == 0
+            assert build_result.returncode == 0 or build_result.returncode == 1  # 0: no issues, 1: warnings only
         finally:
             monkeypatch.undo()
 
