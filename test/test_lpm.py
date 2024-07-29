@@ -118,18 +118,21 @@ class TestLpmSrc:
     def test_atn_install_as_src(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "atn", "-src"])
         monkeypatch.chdir(self.test_dir)
-        LPM.main()
+        try:
+            LPM.main()
+            assert os.path.exists(os.path.join(".", "TempObjects", "sourceInfo.json"))
+            # TODO Add more assertions
+        finally:
+            monkeypatch.undo()
 
-        assert os.path.exists(os.path.join(".", "TempObjects", "sourceInfo.json"))
-
-        project = ASTools.Project(".")
-        build_result = project.build("Intel")
-        assert build_result.returncode == 0
-
-        monkeypatch.undo()
-
-    def test_build(self):
-        assert True
+    def test_build(self, monkeypatch):
+        monkeypatch.chdir(self.test_dir)
+        try:
+            project = ASTools.Project(".")
+            build_result = project.build("Intel")
+            assert build_result.returncode == 0
+        finally:
+            monkeypatch.undo()
 
 
 
