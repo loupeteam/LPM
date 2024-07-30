@@ -115,6 +115,49 @@ class TestLpmSrc:
         version_output = re.fullmatch(r"LPM: \d+\.\d+\.\d+\n", captured.out)
         assert version_output is not None
 
+    # Prior to installing atn, install 1 of 3 dependencies
+    def test_stringext_install(self, monkeypatch):
+        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "stringext"])
+        monkeypatch.chdir(self.test_dir)
+        try:
+            LPM.main()
+
+            with open("package.json") as p:
+                package_dict = json.load(p)
+                assert "@loupeteam/stringext" in package_dict["dependencies"]
+        finally:
+            monkeypatch.undo()
+
+    # Prior to installing atn, install 2nd of 3 dependencies, with explicit version
+    def test_vartools_install_at_version(self, capsys, monkeypatch):
+        monkeypatch.chdir(self.test_dir)
+
+        try:
+            # Attempt invalid version
+            version_invalid = "0.99.9"
+            monkeypatch.setattr(sys, "argv", ["lpm.py", "install", f"vartools@{version_invalid}"])
+
+            LPM.main()
+            captured = capsys.readouterr()
+            
+            print(captured.out)
+            err_match = re.search(r"Error while attempting to install package", captured.out)
+            assert err_match is not None
+
+            # Attempt valid version
+            version_valid = "0.11.3"
+            monkeypatch.setattr(sys, "argv", ["lpm.py", "install", f"vartools@{version_valid}"])
+        
+            LPM.main()
+
+            with open("package.json") as p:
+                package_dict = json.load(p)
+                assert "@loupeteam/vartools" in package_dict["dependencies"]
+                assert version_valid in package_dict["dependencies"]["@loupeteam/vartools"]
+        
+        finally:
+            monkeypatch.undo()
+
     def test_atn_install_as_src(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "atn", "-src"])
         monkeypatch.chdir(self.test_dir)
