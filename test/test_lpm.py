@@ -94,7 +94,7 @@ class TestLpmSrc:
             # Manually modify package.json (avoid dealing with console prompting with "lpm configure")
             with open(os.path.join(LPM_AS_TEMPLATE_PATH, "package.json"), 'r') as p:
                 package_dict = json.load(p)
-            package_dict["lpmConfig"] = {"deploymentConfigs": ["Intel"], "gitClient": "GitExtensions"}
+            package_dict["lpmConfig"] = {"deploymentConfigs": ["Intel", "Arm"], "gitClient": "GitExtensions"}
             with open(os.path.join(LPM_AS_TEMPLATE_PATH, "package.json"), 'w') as p:
                 json.dump(package_dict, p, indent=2)
 
@@ -125,11 +125,20 @@ class TestLpmSrc:
         finally:
             monkeypatch.undo()
 
-    def test_build(self, monkeypatch):
+    def test_build_intel(self, monkeypatch):
         monkeypatch.chdir(self.test_dir)
         try:
             project = ASTools.Project(".")
             build_result = project.build("Intel")
+            assert build_result.returncode == 0 or build_result.returncode == 1  # 0: no issues, 1: warnings only
+        finally:
+            monkeypatch.undo()
+
+    def test_build_arm(self, monkeypatch):
+        monkeypatch.chdir(self.test_dir)
+        try:
+            project = ASTools.Project(".")
+            build_result = project.build("Arm")
             assert build_result.returncode == 0 or build_result.returncode == 1  # 0: no issues, 1: warnings only
         finally:
             monkeypatch.undo()
