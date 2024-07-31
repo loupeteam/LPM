@@ -17,7 +17,7 @@ import ASTools
 LPM_AS_TEMPLATE_FOLDER_NAME = "asproject_template_librarybuilderproject"
 LPM_AS_TEMPLATE_PATH = os.path.join("./test/", LPM_AS_TEMPLATE_FOLDER_NAME)
 
-class TestLpmSrc:
+class TestLpm:
     
     @classmethod
     def setup_class(cls):
@@ -163,8 +163,41 @@ class TestLpmSrc:
         monkeypatch.chdir(self.test_dir)
         try:
             LPM.main()
-            assert os.path.exists(os.path.join(".", "TempObjects", "sourceInfo.json"))
-            # TODO Add more assertions
+
+            source_info_path = os.path.join(".", "TempObjects", "sourceInfo.json")
+            assert os.path.exists(source_info_path)
+            
+            with open(source_info_path) as s:
+                source_info_dict = json.load(s)
+                assert "@loupeteam/atn" in source_info_dict
+        finally:
+            monkeypatch.undo()
+
+    def test_revinfoprog_install_as_src(self, monkeypatch):
+        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "revinfoprog", "--source"])
+        monkeypatch.chdir(self.test_dir)
+        try:
+            LPM.main()
+            
+            source_info_path = os.path.join(".", "TempObjects", "sourceInfo.json")
+            assert os.path.exists(source_info_path)
+            
+            with open(source_info_path) as s:
+                source_info_dict = json.load(s)
+                assert "@loupeteam/revinfoprog" in source_info_dict
+        finally:
+            monkeypatch.undo()
+
+    # Install a representative program (not as source)
+    def test_luxprog_install(self, monkeypatch):
+        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "luxprog"])
+        monkeypatch.chdir(self.test_dir)
+        try:
+            LPM.main()
+
+            with open("package.json") as p:
+                package_dict = json.load(p)
+                assert "@loupeteam/luxprog" in package_dict["dependencies"]
         finally:
             monkeypatch.undo()
 
