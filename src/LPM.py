@@ -961,7 +961,7 @@ def deployPackages(config, packages):
             
             elif((packageType == 'program') | (packageType == 'package')):
                 cpuDeployment = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
-                taskLocation = getPackageManifestField(packageManifest, ['lpm', 'logical', 'destination'])
+                taskLocation = getPackageDestination(packageManifest)
                 # First deploy all configured tasks.
                 if cpuDeployment != None:
                     for item in cpuDeployment:
@@ -996,8 +996,6 @@ def deployPackages(config, packages):
                 cpuDeployment = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
 
                 logicalPackagePath = os.path.normpath(packageSourceInfo['logicalPath'])
-                if "Logical" in logicalPackagePath.split('\\')[0]:
-                    logicalPackagePath = os.path.normpath('\\'.join(logicalPackagePath.split('\\')[1:]))
 
                 if cpuDeployment != None:
                     for item in cpuDeployment:
