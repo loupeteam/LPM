@@ -473,11 +473,21 @@ def importLibraries():
 
 # Login silently by manually creating a the .npmrc file in the user directory.
 def login(token):
-    f = open(os.path.join(os.path.expanduser('~'), '.npmrc'), 'w')
-    text = []
-    text.append('@loupeteam:registry=https://npm.pkg.github.com')
-    text.append('//npm.pkg.github.com/:_authToken=' + token)
-    f.write('\n'.join(text))
+    npm_cfg_file = os.path.join(os.path.expanduser('~'), '.npmrc')
+    f = open(npm_cfg_file, 'r')
+    content = f.readlines()
+    f.close()
+    try:
+        idx = content.index('@loupeteam:registry=https://npm.pkg.github.com')
+        # no expection; already present lets update the token
+        content[idx+1] = '//npm.pkg.github.com/:_authToken=' + token
+    except ValueError as _exp:
+        # Ok not present lets add it
+        content.append('@loupeteam:registry=https://npm.pkg.github.com')
+        content.append('//npm.pkg.github.com/:_authToken=' + token)
+
+    f = open(npm_cfg_file, 'w')
+    f.write('\n'.join(content))
     f.close()
 
 # Logout of the Github registry.  
