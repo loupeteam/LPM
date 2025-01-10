@@ -5,7 +5,7 @@
 #define MyAppVersion "1.0.6"
 #define MyAppPublisher "Loupe"
 #define MyAppURL "https://loupe.team/"
-#define MyAppExeName "LPM.cmd"
+#define MyAppExeName "LPM.exe"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -39,32 +39,15 @@ AlwaysRestart=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "..\src\*.py"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\src\LPM.cmd"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\src\version.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
-; NOTE: Don't use "Flags: ignoreversion" on any shared system files
+Source: "..\dist\LPM.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}";
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait skipifsilent
-Filename: "{cmd}"; Parameters: "/C pip install -r ""{app}\requirements.txt"""; Description: "Installing Python dependencies..."; StatusMsg: "Installing dependencies..."; Check: PythonAndPipExist()
 
 [Code]
-
-{ ///////////////////////////////////////////////////////////////////// }
-function PythonAndPipExist(): Boolean;
-var
-  ErrorCode: Integer;
-begin
-  if Exec('python', '--version', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode) and 
-     Exec('pip', '--version', '', SW_HIDE, ewWaitUntilTerminated, ErrorCode) then
-    Result := True
-  else
-    Result := False;
-end;
 
 { ///////////////////////////////////////////////////////////////////// }
 function GetUninstallString(): String;

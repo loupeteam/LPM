@@ -27,10 +27,6 @@ jobs:
       - name: Install Inno Setup silently
         run: .\is.exe /verysilent /dir="C:\Program Files\InnoSetup"
 
-      - name: Create the EXE Installer
-        working-directory: ./utils
-        run: ./BuildInstaller.bat
-
       - name: Code Signing Setup - Setup Certificate
         shell: bash
         run: echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
@@ -52,7 +48,27 @@ jobs:
           C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
           smksp_cert_sync.exe
 
-      - name: Code Signing Setup - Sign using Signtool
+      - name: Setup python virtual environment
+        run: |
+          python -m venv .venv
+          .venv\Scripts\Activate
+          pip install -r requirements.dev.txt
+
+      - name: Create the EXE Installer
+        working-directory: ./utils
+        run:
+          ./BuildExecutable.bat
+
+      - name: Code Signing Setup - Sign Executable using Signtool
+        run: |
+          signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "./dist/LPM.exe"
+          signtool.exe verify /v /pa "./dist/LPM.exe"
+
+      - name: Create the EXE Installer
+        working-directory: ./utils
+        run: ./BuildInstaller.bat
+
+      - name: Code Signing Setup - Sign Installer using Signtool
         run: |
           signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "./build/LPM-Setup.exe"
           signtool.exe verify /v /pa "./build/LPM-Setup.exe"
