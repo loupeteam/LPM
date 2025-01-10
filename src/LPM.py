@@ -50,6 +50,7 @@ def main():
     parser.add_argument('-src', '--source', action='store_true', help='Use source code for libraries instead of binaries')
     parser.add_argument('-nc', '--nocolor', action='store_true', help='Dont color the output - to avoid dependency on termcolor')
     parser.add_argument('-t', '--token', type=str, help='Personal Access Token required for silent login')
+    parser.add_argument('-S', '--scope', type=str, help='Applied scope to select differen registry', default='@loupeteam')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s: ' + __version__)
     args = parser.parse_args()
 
@@ -63,22 +64,29 @@ def main():
         def cprint(text, color):
             print(text)
 
-    # Prepend the @loupeteam prefix to all package names, and split any @version suffixes off into separate struct.
+    # Prepend the scope  prefix to all package names without scope, and split any @version suffixes off into separate struct.
     packages = []
     packageVersions = []
     if(args.packages):   
         for item in args.packages:
+            package_scope: str = args.scope
             # Force package name to lowercase, by convention
-            item = item.lower()
+            package_name: str = item.lower()
+            package_version: str = ''
+
+            # Scope present in package name
+            if package_name[0] == '@':
+                package_scope = package_name.split('/')[0]
+                package_name = package_name.split('/')[1]
+
             # If the @ character is present, it means there's a version specifier.
-            if('@' in item):
-                splitItem = item.split('@')
-                packages.append('@loupeteam/' + splitItem[0])
-                packageVersions.append(splitItem[1])
-            # Othersie, version string is empty.
-            else:
-                packages.append('@loupeteam/' + item)
-                packageVersions.append('')
+            if '@' in package_name:
+                splitItem = package_name.split('@')
+                package_name = splitItem[0]
+                package_version = splitItem[1]
+
+            packages.append(f'{package_scope}/{package_name}')
+            packageVersions.append(package_version)
 
     # Authenticate with a custom personal access token. 
     if(args.cmd == 'login'):
@@ -358,8 +366,8 @@ def main():
         elif(args.cmd == 'publish'):
             # Introspect the package.json to verify that the package name has the right scope prefix (i.e. @loupeteam). 
             data = getPackageManifestData('package.json')
-            if data['name'].find('@loupeteam') != 0:
-                cprint('Error: the package name must include the @loupeteam scope prefix.', 'yellow')
+            if data['name'].find(args.scope) != 0:
+                cprint('Error: the package name must include the '+args.scope+' scope prefix.', 'yellow')
             else:
                 try:
                     # Introspect the package.json to verify that the 'repository' field is present. 
@@ -902,20 +910,22 @@ def syncPackages(packages):
         elif((packageType == 'program') | (packageType == 'package')):
             destination = getPackageDestination(packageManifest)
             # Find the module(s) in node_modules, and sync it/them.
-            for module in os.listdir(os.path.join('node_modules', '@loupeteam')):
-                if (os.path.join('@loupeteam', module) == os.path.normpath(package)):
-                    # Get a handle on the folder destination.
-                    destinationPkg = ASTools.Package(destination)
-                    # Create a list of filtered objects that don't get copied over.
-                    filter = ['package.pkg', 'license', 'readme.md', 'package.json', 'changelog.md']
-                    # Loop through all contents in the source directory and copy them over one by one. 
-                    for item in os.listdir(os.path.join('node_modules', '@loupeteam', module)):
-                        if (item.lower() not in filter):
-                            # If the item already exists, delete it.
-                            destinationItem = os.path.join(destination, item)
-                            if os.path.exists(destinationItem):
-                                destinationPkg.removeObject(item)
-                            destinationPkg.addObject(os.path.join('node_modules', package, item))
+            for scope in os.listdir('node_modules'):
+                if scope[0]== '@':
+                    for module in os.listdir(os.path.join('node_modules', scope)):            
+                        if (os.path.join(scope, module) == os.path.normpath(package)):
+                            # Get a handle on the folder destination.
+                            destinationPkg = ASTools.Package(destination)
+                            # Create a list of filtered objects that don't get copied over.
+                            filter = ['package.pkg', 'license', 'readme.md', 'package.json', 'changelog.md']
+                            # Loop through all contents in the source directory and copy them over one by one. 
+                            for item in os.listdir(os.path.join('node_modules', scope, module)):
+                                if (item.lower() not in filter):
+                                    # If the item already exists, delete it.
+                                    destinationItem = os.path.join(destination, item)
+                                    if os.path.exists(destinationItem):
+                                        destinationPkg.removeObject(item)
+                                    destinationPkg.addObject(os.path.join('node_modules', package, item))
 
         elif(packageType == 'library') or (packageType == None):
             packageDestination = getPackageManifestField(packageManifest, ['lpm', 'logical', 'destination'])
@@ -927,15 +937,17 @@ def syncPackages(packages):
             # Now create the packages in this path that doesn't exist.
             createPackageTree(destination)
             # Find the module(s) in node_modules, and sync it/them.
-            for module in os.listdir(os.path.join('node_modules', '@loupeteam')):
-                if (os.path.join('@loupeteam', module) == os.path.normpath(package)):
-                    # Get a handle on the library's parent folder.
-                    parentPkg = ASTools.Package(destination)
-                    # If the library already exists, delete it. 
-                    libraryPath = os.path.join(destination, module)
-                    if os.path.isdir(libraryPath):
-                        parentPkg.removeObject(module)
-                    parentPkg.addObject(os.path.join('node_modules', package))
+            for scope in os.listdir('node_modules'):
+                if scope[0]== '@':
+                    for module in os.listdir(os.path.join('node_modules', scope)):
+                        if (os.path.join(scope, module) == os.path.normpath(package)):
+                            # Get a handle on the library's parent folder.
+                            parentPkg = ASTools.Package(destination)
+                            # If the library already exists, delete it. 
+                            libraryPath = os.path.join(destination, module)
+                            if os.path.isdir(libraryPath):
+                                parentPkg.removeObject(module)
+                            parentPkg.addObject(os.path.join('node_modules', package))
 
 def deployPackages(config, packages):
     # Figure out where the deployment table is for this configuration.
