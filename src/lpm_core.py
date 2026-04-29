@@ -139,7 +139,7 @@ def configureProject(args):
     deploymentConfigs = getPackageManifestField('package.json', ['lpmConfig', 'deploymentConfigs'])
     if(deploymentConfigs == None): deploymentConfigs = []
     if (args.nocolor) or (args.silent):
-        print('Support for interactice prompts is disabled. Default values will be assigned to the package.json file.')
+        print('Support for interactive prompts is disabled. Default values will be assigned to the package.json file.')
         print('All configurations in the project are being assigned as deployment targets: ' + ' '.join(project.buildConfigNames))
         setPackageManifestField('package.json', 'deploymentConfigs', project.buildConfigNames)
     else:
