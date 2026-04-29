@@ -241,7 +241,9 @@ def uninstallPackages(packages):
     execute(command, False)
 
 # Install lpm package source by cloning package's repo folder
-def installSource(package, version, sourceDependencies=[]):
+def installSource(package, version, sourceDependencies=None):
+    if sourceDependencies is None:
+        sourceDependencies = []
     # Package names are forced to lower case by convention
     package = package.lower()
     repoName = getRepoName(package)
