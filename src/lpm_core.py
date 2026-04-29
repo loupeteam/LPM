@@ -139,7 +139,7 @@ def configureProject(args):
     deploymentConfigs = getPackageManifestField('package.json', ['lpmConfig', 'deploymentConfigs'])
     if(deploymentConfigs == None): deploymentConfigs = []
     if (args.nocolor) or (args.silent):
-        print('Support for interactice prompts is disabled. Default values will be assigned to the package.json file.')
+        print('Support for interactive prompts is disabled. Default values will be assigned to the package.json file.')
         print('All configurations in the project are being assigned as deployment targets: ' + ' '.join(project.buildConfigNames))
         setPackageManifestField('package.json', 'deploymentConfigs', project.buildConfigNames)
     else:
@@ -241,7 +241,9 @@ def uninstallPackages(packages):
     execute(command, False)
 
 # Install lpm package source by cloning package's repo folder
-def installSource(package, version, sourceDependencies=[]):
+def installSource(package, version, sourceDependencies=None):
+    if sourceDependencies is None:
+        sourceDependencies = []
     # Package names are forced to lower case by convention
     package = package.lower()
     repoName = getRepoName(package)
