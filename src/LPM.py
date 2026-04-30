@@ -87,7 +87,7 @@ def _normalize_packages(raw_packages):
 
 def cmd_login(args):
     if not args.silent:
-        cprint('Please follow the prompts below to log in using valid Github credentials.', 'yellow')
+        cprint('Please follow the prompts below to log in using valid GitHub credentials.', 'yellow')
         token = input(colored('? ', 'green') + 'Enter your personal access token: ')
         login(token)
     else:
@@ -392,7 +392,7 @@ def _build_parser(prog_name):
     parser.add_argument('-s', '--silent', action='store_true',
                         help='Execute commands silently with default values and no operator prompts')
     parser.add_argument('-nc', '--nocolor', action='store_true',
-                        help='Dont color the output - to avoid dependency on termcolor')
+                        help="Don't color the output - to avoid dependency on termcolor")
     parser.add_argument('-v', '--version', action='version', version='%(prog)s: ' + __version__)
 
     sub = parser.add_subparsers(dest='cmd', metavar='command')
