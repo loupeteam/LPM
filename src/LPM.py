@@ -370,8 +370,10 @@ def cmd_publish(args):
 
 def cmd_list(args):
     if args.packages:
-        # Defer to npm with the supplied packages.
-        runGenericNpmCmd('list', args.packages)
+        # Defer to npm with normalized package names for consistency with
+        # other commands and scoped Loupe package handling.
+        packages, _ = _normalize_packages(args.packages)
+        runGenericNpmCmd('list', packages)
         cprint('Operation completed', 'green')
         return
     executeStandard(['npm list', '-all'])
