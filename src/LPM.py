@@ -86,12 +86,17 @@ def _normalize_packages(raw_packages):
 # ---------------------------------------------------------------------------
 
 def cmd_login(args):
-    if not args.silent:
+    if args.silent:
+        if not args.token:
+            print(colored('Error: --token is required when using --silent.', 'red'))
+            return
+        login(args.token)
+    elif args.token:
+        login(args.token)
+    else:
         cprint('Please follow the prompts below to log in using valid GitHub credentials.', 'yellow')
         token = input(colored('? ', 'green') + 'Enter your personal access token: ')
         login(token)
-    else:
-        login(args.token)
     if isAuthenticated():
         print(colored(f'New credentials for {getAuthenticatedUser()} successfully stored.', 'green'))
     else:
