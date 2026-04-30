@@ -1,5 +1,10 @@
 # Change log
 
+- 1.1.0 - Add support for additional GitHub-hosted scopes via `~/.lpm/config.json`
+          (or per-project `lpmConfig.scopes`). Default behavior is unchanged
+          when no config file is present. `lpm publish` remains restricted to
+          `@loupeteam` for now.
+
 - 1.0.6 - Fix installation of packages as source. 
         - Add pytesting infrastructure.
         
