@@ -55,7 +55,7 @@ cprint = _plain_print
 # ---------------------------------------------------------------------------
 
 # Commands that never require authentication.
-_NO_AUTH = {'login', 'delete', 'status'}
+_NO_AUTH = {'login', 'logout', 'delete', 'status'}
 
 # Commands that may run before `lpm init` has been invoked (i.e. don't require
 # a package.json in the current directory).
