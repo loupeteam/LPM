@@ -366,7 +366,7 @@ def cmd_publish(args):
     # publish flow is verified for user-added scopes. The check would become:
     #     scope = lpm_config.scope_for_package(data['name'])
     #     if lpm_config.get_scope_info(scope) is None: ...
-    if data['name'].find('@loupeteam') != 0:
+    if not data['name'].startswith('@loupeteam/'):
         cprint('Error: the package name must include the @loupeteam scope prefix.', 'yellow')
         return
     try:

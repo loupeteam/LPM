@@ -22,6 +22,7 @@ import subprocess
 import sys
 import re
 import requests
+from urllib.parse import urlparse
 
 from termcolor import colored, cprint
 
@@ -113,7 +114,14 @@ def login(token):
     for scope, info in lpm_config.get_scopes().items():
         text.append(f'{scope}:registry={info["registry"]}')
     for scope, info in lpm_config.get_scopes().items():
-        host = info['registry'].split('://', 1)[-1].rstrip('/')
+        # Use urlparse so registries with paths (e.g.
+        # https://npm.pkg.github.com/some-path) or embedded credentials still
+        # produce a clean host for the auth line.
+        host = urlparse(info['registry']).netloc
+        if not host:
+            # Misconfigured registry URL; skip rather than write a broken
+            # //<empty>/:_authToken= line.
+            continue
         if host in auth_hosts_written:
             continue
         auth_hosts_written.add(host)
@@ -127,6 +135,7 @@ def logout():
     if(os.path.exists('./.npmrc')):
         os.remove('./.npmrc')
     # And perform the npm logout per configured scope to globally logout as well.
+    failed = []
     for scope, info in lpm_config.get_scopes().items():
         command = []
         command.append('npm logout')
@@ -134,9 +143,13 @@ def logout():
         command.append(f'--registry={info["registry"]}')
         try:
             executeStandard(command)
-        except Exception:
-            # Don't let a failure on one scope abort the rest.
-            pass
+        except Exception as exc:
+            # Don't let a failure on one scope abort the rest, but record
+            # the failure so the user knows logout was incomplete.
+            failed.append((scope, info['registry'], exc))
+    if failed:
+        for scope, registry, exc in failed:
+            cprint(f"Warning: npm logout failed for {scope} ({registry}): {exc}", 'yellow')
 
 # Remove all LPM references from the project.
 def deleteProject():
@@ -273,7 +286,18 @@ def installSource(package, version, sourceDependencies=None):
             username = getAuthenticatedUser()
             password = getLocalToken()
             # Clone the repo into the target directory.
-            org = lpm_config.org_for_package(package)
+            # Resolve the org from the package's scope. We require the scope
+            # to be configured rather than silently falling back to the
+            # default org -- a typo (e.g. @looupeteam/foo) must not result in
+            # a clone from the wrong organization.
+            scope = lpm_config.scope_for_package(package)
+            if lpm_config.get_scope_info(scope) is None:
+                raise Exception(
+                    f"Cannot install source for {package}: scope {scope} is not "
+                    "configured. Add it to ~/.lpm/config.json or your project's "
+                    "lpmConfig.scopes before installing as source."
+                )
+            org = lpm_config.get_org_for_scope(scope)
             command1 = []
             command1.append('git clone')
             command1.append(f'https://{username}:{password}@github.com/{org}/{repoName}')
@@ -789,48 +813,53 @@ def printLoupePackageList():
     print("Retrieving package data...")
     (error, data) = getPackageListData()
 
-    if not error:
-        packages_sorted = sorted(data, key=lambda x: x["name"])
-
-        # Pre-process package descriptions; these are handled separately, as they can be None.
-        package_descriptions = []
-        for package in packages_sorted:
-            try:
-                if package['repository']['description'] is not None:
-                    package_descriptions.append(package['repository']['description'])
-                else:
-                    package_descriptions.append(" ")
-            except:
-                package_descriptions.append(" ")
-
-        # Determine column widths.
-        name_col_width = max(len(package["name"]) for package in packages_sorted) + 2
-        scope_col_width = max((len(package.get("_lpm_scope", "")) for package in packages_sorted), default=6) + 2
-        scope_col_width = max(scope_col_width, len("SCOPE") + 2)
-        version_col_width = 12
-        lastmod_col_width = 14
-        description_col_width = max(len(description) for description in package_descriptions)
-
-        # Print the header.
-        print(  "NAME".ljust(name_col_width) +
-                "SCOPE".ljust(scope_col_width) +
-                "VERSIONS".ljust(version_col_width) +
-                "LASTUPDATED".ljust(lastmod_col_width) +
-                "DESCRIPTION".ljust(description_col_width))
-        print(  "----".ljust(name_col_width) +
-                "-----".ljust(scope_col_width) +
-                "--------".ljust(version_col_width) +
-                "-----------".ljust(lastmod_col_width) +
-                "-----------".ljust(description_col_width))
-
-        for idx, package in enumerate(packages_sorted):
-            print(  package["name"].ljust(name_col_width) +
-                    package.get("_lpm_scope", "").ljust(scope_col_width) +
-                    str(package["version_count"]).ljust(version_col_width) +
-                    package["updated_at"][:10].ljust(lastmod_col_width) +
-                    package_descriptions[idx].ljust(description_col_width))
-    else:
+    if error:
         print(f"Unable to print package list: {error}")
+        return
+
+    if not data:
+        print("No packages found.")
+        return
+
+    packages_sorted = sorted(data, key=lambda x: x["name"])
+
+    # Pre-process package descriptions; these are handled separately, as they can be None.
+    package_descriptions = []
+    for package in packages_sorted:
+        try:
+            if package['repository']['description'] is not None:
+                package_descriptions.append(package['repository']['description'])
+            else:
+                package_descriptions.append(" ")
+        except:
+            package_descriptions.append(" ")
+
+    # Determine column widths.
+    name_col_width = max(len(package["name"]) for package in packages_sorted) + 2
+    scope_col_width = max((len(package.get("_lpm_scope", "")) for package in packages_sorted), default=6) + 2
+    scope_col_width = max(scope_col_width, len("SCOPE") + 2)
+    version_col_width = 12
+    lastmod_col_width = 14
+    description_col_width = max((len(description) for description in package_descriptions), default=len("DESCRIPTION"))
+
+    # Print the header.
+    print(  "NAME".ljust(name_col_width) +
+            "SCOPE".ljust(scope_col_width) +
+            "VERSIONS".ljust(version_col_width) +
+            "LASTUPDATED".ljust(lastmod_col_width) +
+            "DESCRIPTION".ljust(description_col_width))
+    print(  "----".ljust(name_col_width) +
+            "-----".ljust(scope_col_width) +
+            "--------".ljust(version_col_width) +
+            "-----------".ljust(lastmod_col_width) +
+            "-----------".ljust(description_col_width))
+
+    for idx, package in enumerate(packages_sorted):
+        print(  package["name"].ljust(name_col_width) +
+                package.get("_lpm_scope", "").ljust(scope_col_width) +
+                str(package["version_count"]).ljust(version_col_width) +
+                package["updated_at"][:10].ljust(lastmod_col_width) +
+                package_descriptions[idx].ljust(description_col_width))
 
 # Fetches data using GitHub API (See https://docs.github.com/en/rest/packages?apiVersion=2022-11-28#list-packages-for-an-organization)
 # When `scope` is None, queries every configured scope's org and concatenates the

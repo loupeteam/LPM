@@ -1,12 +1,8 @@
-'''
- * File: lpm_config.py
- * Copyright (c) 2026 Loupe
- * https://loupe.team
- *
- * This file is part of LPM, licensed under the MIT License.
-'''
-'''
-LPM scope/registry configuration.
+'''LPM scope/registry configuration.
+
+File: lpm_config.py
+Copyright (c) 2026 Loupe (https://loupe.team).
+This file is part of LPM, licensed under the MIT License.
 
 LPM was originally hardcoded to the @loupeteam npm scope (backed by the
 `loupeteam` GitHub organization on npm.pkg.github.com). This module generalizes
