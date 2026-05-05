@@ -201,6 +201,38 @@ class TestLpm:
         finally:
             monkeypatch.undo()
 
+    def test_install_no_args_syncs_and_deploys(self, monkeypatch):
+        """Regression: lpm install with no args should sync and deploy all declared dependencies."""
+        monkeypatch.chdir(self.test_dir)
+        try:
+            # Pre-condition: package.json must already have dependencies (added by prior install tests).
+            with open("package.json") as p:
+                package_dict = json.load(p)
+            deps = package_dict.get("dependencies", {})
+            assert deps, "Pre-condition: package.json must have dependencies"
+
+            from unittest.mock import patch
+
+            with patch("LPM.installPackages"), \
+                 patch("LPM.getAllDependencies", return_value=list(deps.keys())) as mock_get_all_deps, \
+                 patch("LPM.syncPackages") as mock_sync, \
+                 patch("LPM.deployPackages") as mock_deploy:
+                monkeypatch.setattr(sys, "argv", ["lpm.py", "install"])
+                LPM.main()
+
+            # getAllDependencies must have been called with the resolved package list,
+            # not an empty list (which would make sync/deploy a no-op – the original bug).
+            assert mock_get_all_deps.called, "getAllDependencies was not called"
+            call_packages = mock_get_all_deps.call_args_list[0][0][0]
+            assert len(call_packages) > 0, (
+                "getAllDependencies was called with an empty list; "
+                "sync/deploy would be a no-op (regression of the no-args install bug)"
+            )
+            assert mock_sync.called, "syncPackages was not called"
+            assert mock_deploy.called, "deployPackages was not called"
+        finally:
+            monkeypatch.undo()
+
     def test_build_intel(self, monkeypatch):
         monkeypatch.chdir(self.test_dir)
         try:
