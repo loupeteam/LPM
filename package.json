@@ -7,9 +7,16 @@
     "type": "git",
     "url": "git+https://github.com/loupeteam/LPM.git"
   },
+  "bin": {
+    "lpm": "bin/lpm.js"
+  },
   "author": "Loupe",
   "license": "MIT",
+  "scripts": {
+    "postinstall": "python -m pip install -r requirements.txt || python3 -m pip install -r requirements.txt"
+  },
   "files": [
+    "bin/",
     "src/",
     "requirements.txt",
     "docs/",
