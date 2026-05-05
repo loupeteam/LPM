@@ -115,6 +115,39 @@ class TestLpm:
         version_output = re.fullmatch(r"LPM: \d+\.\d+\.\d+\n", captured.out)
         assert version_output is not None
 
+    def test_hoist_silent_after_subcommand(self):
+        """--silent placed after the subcommand should be accepted, not error."""
+        hoisted = LPM._hoist_global_flags(["install", "--silent"])
+        assert hoisted == ["--silent", "install"]
+
+    def test_hoist_silent_after_subcommand_with_package(self):
+        """--silent placed after packages should be hoisted before the subcommand."""
+        hoisted = LPM._hoist_global_flags(["install", "somepkg", "--silent"])
+        assert hoisted == ["--silent", "install", "somepkg"]
+
+    def test_hoist_nocolor_after_subcommand(self):
+        """-nc/--nocolor placed after the subcommand should be hoisted."""
+        hoisted = LPM._hoist_global_flags(["install", "somepkg", "--nocolor"])
+        assert hoisted == ["--nocolor", "install", "somepkg"]
+
+    def test_hoist_flag_before_subcommand_unchanged(self):
+        """Flags already before the subcommand should not be moved."""
+        hoisted = LPM._hoist_global_flags(["--silent", "install", "somepkg"])
+        assert hoisted == ["--silent", "install", "somepkg"]
+
+    def test_hoist_parse_silent_after_subcommand(self, monkeypatch):
+        """lpm install --silent should parse without error and set silent=True."""
+        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "--silent"])
+        monkeypatch.chdir(self.test_dir)
+        try:
+            parser, sub = LPM._build_parser("LPM")
+            raw_args = LPM._hoist_global_flags(["install", "--silent"])
+            ns = parser.parse_args(raw_args)
+            assert ns.silent is True
+            assert ns.cmd == "install"
+        finally:
+            monkeypatch.undo()
+
     # Prior to installing atn, install 1 of 3 dependencies
     def test_stringext_install(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "stringext"])
