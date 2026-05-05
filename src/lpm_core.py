@@ -375,26 +375,37 @@ def getPackageSourcePathFromRepoPackage(repoPath, packageName: str):
                     if ext == '.lby':
                         return path
 
-    # Fallback: no Jenkinsfile or no match found — walk the repo tree searching
-    # for a directory that either has a matching package.json name or is a
-    # library folder (named after the package and containing a .lby file).
+    # Fallback: no Jenkinsfile or no match found — search the repo root then
+    # walk through 'src' and 'source' directories for a subdirectory that
+    # contains a matching package.json or a .lby file.
     basePackageName = os.path.split(packageName)[1].lower()
-    for dirpath, dirnames, filenames in os.walk(repoPath):
-        # Skip hidden dirs (e.g. .git)
-        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
-        packageJsonPath = os.path.join(dirpath, 'package.json')
-        if os.path.exists(packageJsonPath):
-            with open(packageJsonPath) as p:
-                try:
-                    data = json.load(p)
-                    if packageName.lower() == data.get('name', '').lower():
-                        return dirpath
-                except json.JSONDecodeError:
-                    pass
-        folderName = os.path.basename(dirpath).lower()
-        if folderName == basePackageName:
-            if any(os.path.splitext(f)[1] == '.lby' for f in filenames):
-                return dirpath
+
+    def _find_in_tree(search_root):
+        for dirpath, dirnames, filenames in os.walk(search_root):
+            dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+            packageJsonPath = os.path.join(dirpath, 'package.json')
+            if os.path.exists(packageJsonPath):
+                with open(packageJsonPath) as p:
+                    try:
+                        data = json.load(p)
+                        if packageName.lower() == data.get('name', '').lower():
+                            return dirpath
+                    except json.JSONDecodeError:
+                        pass
+            if os.path.basename(dirpath).lower() == basePackageName:
+                if any(os.path.splitext(f)[1] == '.lby' for f in filenames):
+                    return dirpath
+        return None
+
+    # Check repo root itself first, then recurse into src/source only.
+    search_dirs = [repoPath] + [
+        os.path.join(repoPath, d) for d in ('src', 'source')
+        if os.path.isdir(os.path.join(repoPath, d))
+    ]
+    for search_dir in search_dirs:
+        result = _find_in_tree(search_dir)
+        if result is not None:
+            return result
 
     raise ValueError(
         f"Could not find source path for package '{packageName}' in repo '{repoPath}'. "
