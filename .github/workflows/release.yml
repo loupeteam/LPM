@@ -1,69 +1,133 @@
-name: LPM Installer Publish
-run-name: Publish LPM Installer ${{ github.ref_name }}
+name: LPM Release
+run-name: LPM Release ${{ github.ref_name }}
 
 on:
   push:
     tags:
       - v*
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
-  release-installer:
-    runs-on: windows-2022
-    timeout-minutes: 3
-    env:
-      SM_API_KEY: ${{ secrets.SM_API_KEY }}
-      SM_CLIENT_CERT_FILE: "D:\\Certificate_pkcs12.p12"
-      SM_CLIENT_CERT_PASSWORD: ${{ secrets.SM_CLIENT_CERT_PASSWORD }}
-      SM_HOST: ${{ secrets.SM_HOST }}
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Download Inno Setup installer
-        run: Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "is.exe"
-      - name: Install Inno Setup silently
-        run: .\is.exe /verysilent /dir="C:\Program Files\InnoSetup"
-
-      - name: Create the EXE Installer
-        working-directory: ./utils
-        run: ./BuildInstaller.bat
-
-      - name: Code Signing Setup - Setup Certificate
-        shell: bash
-        run: echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
-
-      - name: Code Signing Setup - add to path
-        shell: bash
-        run: |
-          echo "C:\Program Files (x86)\Windows Kits\10\App Certification Kit" >> $GITHUB_PATH
-          echo "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools" >> $GITHUB_PATH
-          echo "C:\Program Files\DigiCert\DigiCert One Signing Manager Tools" >> $GITHUB_PATH
-
-      - name: Code Signing Setup - Setup SSM KSP on windows latest
-        shell: cmd
-        run: |
-          curl -X GET https://one.digicert.com/signingmanager/api-ui/v1/releases/smtools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o smtools-windows-x64.msi
-          msiexec /i smtools-windows-x64.msi /quiet /qn
-          smksp_registrar.exe list
-          smctl.exe keypair ls
-          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
-          smksp_cert_sync.exe
-
-      - name: Code Signing Setup - Sign using Signtool
-        run: |
-          signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "./build/LPM-Setup.exe"
-          signtool.exe verify /v /pa "./build/LPM-Setup.exe"
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+      - name: Set up Node.js for GitHub Packages
+        uses: actions/setup-node@v4
         with:
-          aws-region: us-west-2
-          aws-access-key-id: ${{ secrets.LPM_S3_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.LPM_S3_SECRET_ACCESS_KEY }}
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@loupeteam'
 
-      - name: Upload Installer to S3
+      - name: Validate versions match tag
+        shell: bash
         run: |
-          aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/latest/LPM-Setup.exe
-          aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/${{ github.ref_name }}/LPM-Setup.exe
+          tag_version="${{ github.ref_name }}"
+          tag_version="${tag_version#v}"
+          pkg_version=$(node -p "require('./package.json').version")
+          src_version=$(python3 -c "import json; print(json.load(open('src/version.json'))['version'])")
+          if [ "$pkg_version" != "$tag_version" ]; then
+            echo "ERROR: package.json version ($pkg_version) does not match tag ($tag_version)."
+            echo "Bump the version in package.json and src/version.json before tagging."
+            exit 1
+          fi
+          if [ "$src_version" != "$tag_version" ]; then
+            echo "ERROR: src/version.json version ($src_version) does not match tag ($tag_version)."
+            echo "Bump the version in package.json and src/version.json before tagging."
+            exit 1
+          fi
+          echo "Version check passed: $tag_version"
+
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # TEMPORARILY DISABLED: Code signing certificate is not currently working.
+  # Re-enable this job (windows-2022 runner required) once resolved.
+  # release-installer:
+  #   runs-on: windows-2022
+  #   timeout-minutes: 10
+  #   env:
+  #     SM_API_KEY: ${{ secrets.SM_API_KEY }}
+  #     SM_CLIENT_CERT_FILE: "D:\\Certificate_pkcs12.p12"
+  #     SM_CLIENT_CERT_PASSWORD: ${{ secrets.SM_CLIENT_CERT_PASSWORD }}
+  #     SM_HOST: ${{ secrets.SM_HOST }}
+  #   steps:
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
+  #
+  #     - name: Download Inno Setup installer
+  #       run: Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "is.exe"
+  #     - name: Install Inno Setup silently
+  #       run: .\is.exe /verysilent /dir="C:\Program Files\InnoSetup"
+  #
+  #     - name: Create the EXE Installer
+  #       working-directory: ./utils
+  #       run: ./BuildInstaller.bat
+  #
+  #     - name: Code Signing Setup - Setup Certificate
+  #       shell: bash
+  #       run: echo "${{secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
+  #
+  #     - name: Code Signing Setup - add to path
+  #       shell: bash
+  #       run: |
+  #         echo "C:\Program Files (x86)\Windows Kits\10\App Certification Kit" >> $GITHUB_PATH
+  #         echo "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools" >> $GITHUB_PATH
+  #         echo "C:\Program Files\DigiCert\DigiCert One Signing Manager Tools" >> $GITHUB_PATH
+  #
+  #     - name: Code Signing Setup - Setup SSM KSP on windows latest
+  #       shell: cmd
+  #       run: |
+  #         curl -X GET https://one.digicert.com/signingmanager/api-ui/v1/releases/smtools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o smtools-windows-x64.msi
+  #         msiexec /i smtools-windows-x64.msi /quiet /qn
+  #         smksp_registrar.exe list
+  #         smctl.exe keypair ls
+  #         C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
+  #         smksp_cert_sync.exe
+  #
+  #     - name: Code Signing Setup - Sign using Signtool
+  #       run: |
+  #         signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "./build/LPM-Setup.exe"
+  #         signtool.exe verify /v /pa "./build/LPM-Setup.exe"
+  #
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4.0.2
+  #       with:
+  #         aws-region: us-west-2
+  #         aws-access-key-id: ${{ secrets.LPM_S3_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.LPM_S3_SECRET_ACCESS_KEY }}
+  #
+  #     - name: Upload Installer to S3
+  #       run: |
+  #         aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/latest/LPM-Setup.exe
+  #         aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/${{ github.ref_name }}/LPM-Setup.exe
+  #
+  #     - name: Attach EXE to GitHub Release
+  #       uses: softprops/action-gh-release@v2
+  #       with:
+  #         tag_name: ${{ github.ref_name }}
+  #         files: ./build/LPM-Setup.exe
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
