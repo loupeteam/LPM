@@ -33,6 +33,12 @@ from ASPython import ASTools
 # Core LPM functionality. The CLI delegates to functions defined in lpm_core.
 from lpm_core import *
 
+# Spellings of flags that are global (top-level) and must appear before the
+# subcommand for argparse to recognise them.  Centralised here so that
+# _hoist_global_flags(), the fallback parser, and any future code all stay
+# in sync automatically.
+_GLOBAL_FLAG_SPELLINGS = {'-s', '--silent', '-nc', '--nocolor'}
+
 
 # ---------------------------------------------------------------------------
 # Output coloring helpers.
@@ -500,7 +506,7 @@ def _hoist_global_flags(argv):
 
     This allows both ``lpm --silent install`` and ``lpm install --silent``.
     """
-    global_flags = {'-s', '--silent', '-nc', '--nocolor'}
+    global_flags = _GLOBAL_FLAG_SPELLINGS
     prefix = []   # tokens up to and including the subcommand
     suffix = []   # tokens after the subcommand
     cmd_found = False
@@ -562,6 +568,7 @@ def main():
     # Legacy behavior: any unrecognized first command is forwarded to npm.
     if raw_args and not _is_known_command(parser, sub, raw_args):
         fallback = argparse.ArgumentParser(add_help=False)
+        # Keep these in sync with _GLOBAL_FLAG_SPELLINGS.
         fallback.add_argument('-s', '--silent', action='store_true')
         fallback.add_argument('-nc', '--nocolor', action='store_true')
         ns, leftover = fallback.parse_known_args(raw_args)
@@ -569,7 +576,7 @@ def main():
         ns.packages = leftover[1:]
         ns.func = cmd_npm_passthrough  # type: ignore[attr-defined]
     else:
-        ns = parser.parse_args()
+        ns = parser.parse_args(raw_args)
 
     # Configure output coloring now that --nocolor is known.
     if not ns.nocolor:
