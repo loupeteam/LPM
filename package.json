@@ -1,6 +1,6 @@
 {
   "name": "@loupeteam/lpm",
-  "version": "1.0.6",
+  "version": "1.1.1",
   "description": "LPM - Loupe Package Manager. A lightweight wrapper around NPM that processes Loupe packages.",
   "homepage": "https://loupeteam.github.io/LoupeDocs/tools/lpm.html",
   "repository": {
