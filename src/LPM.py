@@ -97,7 +97,9 @@ def cmd_login(args):
         cprint('Please follow the prompts below to log in using valid GitHub credentials.', 'yellow')
         token = input(colored('? ', 'green') + 'Enter your personal access token: ')
         login(token)
-    if isAuthenticated():
+    if getattr(args, 'no_check', False):
+        print('Credentials stored (authentication check skipped).')
+    elif isAuthenticated():
         print(colored(f'New credentials for {getAuthenticatedUser()} successfully stored.', 'green'))
     else:
         print(colored('Error: invalid credentials. Please try again.', 'red'))
@@ -412,6 +414,8 @@ def _build_parser(prog_name):
     # login
     p = sub.add_parser('login', help='Authenticate with the GitHub package registry')
     p.add_argument('-t', '--token', type=str, help='Personal Access Token required for silent login')
+    p.add_argument('--no-check', action='store_true', dest='no_check',
+                   help='Skip the post-login authentication check (useful for CI machine tokens)')
     p.set_defaults(func=cmd_login)
 
     # logout
