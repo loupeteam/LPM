@@ -266,6 +266,11 @@ def cmd_install(args):
         except:
             cprint('Error while attempting to install package(s).', 'yellow')
             return
+        # If no explicit packages were given, resolve the full list from the
+        # local package.json so that sync and deploy still run.
+        if not packages:
+            deps = getPackageManifestField('package.json', ['dependencies']) or {}
+            packages = list(deps.keys())
         # Move packages from the node_modules folder into the project/main directory.
         syncPackages(getAllDependencies(packages))
         sourceDependencies = []
