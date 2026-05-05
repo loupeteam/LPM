@@ -13,7 +13,7 @@
   "author": "Loupe",
   "license": "MIT",
   "scripts": {
-    "postinstall": "python -m pip install -r requirements.txt || python3 -m pip install -r requirements.txt"
+    "postinstall": "python -m pip install --user -r requirements.txt || python3 -m pip install --user -r requirements.txt"
   },
   "files": [
     "bin/",
