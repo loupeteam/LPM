@@ -13,10 +13,11 @@
   "author": "Loupe",
   "license": "MIT",
   "scripts": {
-    "postinstall": "python -m pip install --user -r requirements.txt || python3 -m pip install --user -r requirements.txt"
+    "postinstall": "node scripts/postinstall.js"
   },
   "files": [
     "bin/",
+    "scripts/",
     "src/",
     "requirements.txt",
     "docs/",
