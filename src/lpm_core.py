@@ -317,8 +317,8 @@ def installSource(package, version, sourceDependencies=None):
         sourceInfo[package]["packageSourcePath"] = packageSourcePath
         sourceInfo[package]['logicalPath'] = os.path.join(packageDestination, os.path.normpath(packageSourcePath).split(os.sep)[-1])
         saveJsonData(sourceInfo, sourceInfoFilePath)
-    except:
-        raise Exception("Error cloning the repo")
+    except Exception as e:
+        raise Exception(f"Error installing source for '{package}': {e}") from e
 
 # Get destination of LPM package using manifest, defaulting if unspecified
 def getPackageDestination(packageManifestPath):
@@ -374,6 +374,32 @@ def getPackageSourcePathFromRepoPackage(repoPath, packageName: str):
                     (root, ext) = os.path.splitext(file)
                     if ext == '.lby':
                         return path
+
+    # Fallback: no Jenkinsfile or no match found — walk the repo tree searching
+    # for a directory that either has a matching package.json name or is a
+    # library folder (named after the package and containing a .lby file).
+    basePackageName = os.path.split(packageName)[1].lower()
+    for dirpath, dirnames, filenames in os.walk(repoPath):
+        # Skip hidden dirs (e.g. .git)
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        packageJsonPath = os.path.join(dirpath, 'package.json')
+        if os.path.exists(packageJsonPath):
+            with open(packageJsonPath) as p:
+                try:
+                    data = json.load(p)
+                    if packageName.lower() == data.get('name', '').lower():
+                        return dirpath
+                except json.JSONDecodeError:
+                    pass
+        folderName = os.path.basename(dirpath).lower()
+        if folderName == basePackageName:
+            if any(os.path.splitext(f)[1] == '.lby' for f in filenames):
+                return dirpath
+
+    raise ValueError(
+        f"Could not find source path for package '{packageName}' in repo '{repoPath}'. "
+        "No Jenkinsfile packagesToPublish entry and no matching directory found."
+    )
 
 def getJsonData(jsonFilePath):
     # Create file only if it doesn't already exist
