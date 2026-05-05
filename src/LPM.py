@@ -495,6 +495,29 @@ def _build_parser(prog_name):
     return parser, sub
 
 
+def _hoist_global_flags(argv):
+    """Move -s/--silent and -nc/--nocolor before the subcommand if they appear after it.
+
+    This allows both ``lpm --silent install`` and ``lpm install --silent``.
+    """
+    global_flags = {'-s', '--silent', '-nc', '--nocolor'}
+    prefix = []   # tokens up to and including the subcommand
+    suffix = []   # tokens after the subcommand
+    cmd_found = False
+    for token in argv:
+        if not cmd_found:
+            prefix.append(token)
+            if not token.startswith('-'):
+                cmd_found = True
+        else:
+            if token in global_flags:
+                # Insert before the subcommand (last item in prefix).
+                prefix.insert(len(prefix) - 1, token)
+            else:
+                suffix.append(token)
+    return prefix + suffix
+
+
 def _is_known_command(parser, sub, argv):
     """Return True if argv contains a recognized subcommand.
 
@@ -534,7 +557,7 @@ def main():
 
     parser, sub = _build_parser(prog_name)
 
-    raw_args = sys.argv[1:]
+    raw_args = _hoist_global_flags(sys.argv[1:])
 
     # Legacy behavior: any unrecognized first command is forwarded to npm.
     if raw_args and not _is_known_command(parser, sub, raw_args):
