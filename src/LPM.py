@@ -32,6 +32,7 @@ from ASPython import ASTools
 
 # Core LPM functionality. The CLI delegates to functions defined in lpm_core.
 from lpm_core import *
+import lpm_config
 
 # Spellings of flags that are global (top-level) and must appear before the
 # subcommand for argparse to recognise them.  Centralised here so that
@@ -72,17 +73,32 @@ _NO_INIT_REQUIRED = {
 
 
 def _normalize_packages(raw_packages):
-    """Prepend the @loupeteam scope and split @version suffixes."""
+    """Prepend the configured default scope and split @version suffixes.
+
+    If a user passes an already-scoped name like ``@acme/foo`` it is left
+    intact so additional registries (configured via ``lpm_config``) work.
+    """
+    default_scope = lpm_config.get_default_scope()
     packages = []
     versions = []
     for item in raw_packages or []:
         item = item.lower()
-        if '@' in item:
+        if item.startswith('@') and '/' in item:
+            # Already-scoped name (e.g. "@acme/foo" or "@acme/foo@1.2.3").
+            # Split on the last '@' if there's a version suffix.
+            if item.count('@') >= 2:
+                at_pos = item.rfind('@')
+                packages.append(item[:at_pos])
+                versions.append(item[at_pos+1:])
+            else:
+                packages.append(item)
+                versions.append('')
+        elif '@' in item:
             name, _, version = item.partition('@')
-            packages.append('@loupeteam/' + name)
+            packages.append(f'{default_scope}/' + name)
             versions.append(version)
         else:
-            packages.append('@loupeteam/' + item)
+            packages.append(f'{default_scope}/' + item)
             versions.append('')
     return packages, versions
 
@@ -245,7 +261,10 @@ def cmd_init(args):
             print(colored('This directory has been initialized as a stand-alone package manager.', 'green'))
         else:
             initializeProject()
-            starterProject = ['@loupeteam/starterasproject49']
+            # TODO: support per-scope starter projects. For now we always
+            # bootstrap from the default scope (which is @loupeteam unless the
+            # user has overridden it in their lpm config).
+            starterProject = [f'{lpm_config.get_default_scope()}/starterasproject49']
             installPackages(starterProject, [''])
             syncPackages(starterProject)
             configureProject(args)
@@ -352,7 +371,15 @@ def cmd_git(args):
 
 def cmd_publish(args):
     data = getPackageManifestData('package.json')
-    if data['name'].find('@loupeteam') != 0:
+    # Publishing is currently restricted to the @loupeteam scope. The
+    # multi-scope refactor wires everything else through lpm_config, but the
+    # publish flow has not been validated end-to-end against user-added
+    # scopes/registries yet.
+    # TODO: replace this guard with `lpm_config.get_scope_info(scope)` once the
+    # publish flow is verified for user-added scopes. The check would become:
+    #     scope = lpm_config.scope_for_package(data['name'])
+    #     if lpm_config.get_scope_info(scope) is None: ...
+    if not data['name'].startswith('@loupeteam/'):
         cprint('Error: the package name must include the @loupeteam scope prefix.', 'yellow')
         return
     try:

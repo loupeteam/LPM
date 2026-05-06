@@ -22,10 +22,13 @@ import subprocess
 import sys
 import re
 import requests
+from urllib.parse import urlparse
 
 from termcolor import colored, cprint
 
 from ASPython import ASTools
+
+import lpm_config
 
 
 def isAuthenticated():
@@ -82,8 +85,9 @@ def importLibraries():
     # Read the list of existing packages.
     packages_to_import = []
     package_versions_to_import = []
+    default_scope = lpm_config.get_default_scope()
     for library in loupePkg.objects:
-        packages_to_import.append('@loupeteam/' + library.text)
+        packages_to_import.append(f'{default_scope}/' + library.text)
         package_versions_to_import.append(library.version)
     # Install them.
     try:
@@ -102,8 +106,26 @@ def importLibraries():
 def login(token):
     f = open(os.path.join(os.path.expanduser('~'), '.npmrc'), 'w')
     text = []
-    text.append('@loupeteam:registry=https://npm.pkg.github.com')
-    text.append('//npm.pkg.github.com/:_authToken=' + token)
+    # Write a registry mapping line for every configured scope. All scopes
+    # currently share the GitHub Packages host, so a single auth token line
+    # covers them. We deduplicate auth lines by host in case a user later
+    # configures a non-GitHub registry.
+    auth_hosts_written = set()
+    for scope, info in lpm_config.get_scopes().items():
+        text.append(f'{scope}:registry={info["registry"]}')
+    for scope, info in lpm_config.get_scopes().items():
+        # Use urlparse so registries with paths (e.g.
+        # https://npm.pkg.github.com/some-path) or embedded credentials still
+        # produce a clean host for the auth line.
+        host = urlparse(info['registry']).netloc
+        if not host:
+            # Misconfigured registry URL; skip rather than write a broken
+            # //<empty>/:_authToken= line.
+            continue
+        if host in auth_hosts_written:
+            continue
+        auth_hosts_written.add(host)
+        text.append(f'//{host}/:_authToken=' + token)
     f.write('\n'.join(text))
     f.close()
 
@@ -112,12 +134,22 @@ def logout():
     # If there's a local .npmrc file, remove it.
     if(os.path.exists('./.npmrc')):
         os.remove('./.npmrc')
-    # And perform the npm logout to globally logout as well.
-    command = []
-    command.append('npm logout')
-    command.append('--scope=@loupeteam')
-    command.append('--registry=https://npm.pkg.github.com')
-    executeStandard(command)
+    # And perform the npm logout per configured scope to globally logout as well.
+    failed = []
+    for scope, info in lpm_config.get_scopes().items():
+        command = []
+        command.append('npm logout')
+        command.append(f'--scope={scope}')
+        command.append(f'--registry={info["registry"]}')
+        try:
+            executeStandard(command)
+        except Exception as exc:
+            # Don't let a failure on one scope abort the rest, but record
+            # the failure so the user knows logout was incomplete.
+            failed.append((scope, info['registry'], exc))
+    if failed:
+        for scope, registry, exc in failed:
+            cprint(f"Warning: npm logout failed for {scope} ({registry}): {exc}", 'yellow')
 
 # Remove all LPM references from the project.
 def deleteProject():
@@ -254,9 +286,21 @@ def installSource(package, version, sourceDependencies=None):
             username = getAuthenticatedUser()
             password = getLocalToken()
             # Clone the repo into the target directory.
+            # Resolve the org from the package's scope. We require the scope
+            # to be configured rather than silently falling back to the
+            # default org -- a typo (e.g. @looupeteam/foo) must not result in
+            # a clone from the wrong organization.
+            scope = lpm_config.scope_for_package(package)
+            if lpm_config.get_scope_info(scope) is None:
+                raise Exception(
+                    f"Cannot install source for {package}: scope {scope} is not "
+                    "configured. Add it to ~/.lpm/config.json or your project's "
+                    "lpmConfig.scopes before installing as source."
+                )
+            org = lpm_config.get_org_for_scope(scope)
             command1 = []
             command1.append('git clone')
-            command1.append(f'https://{username}:{password}@github.com/loupeteam/{repoName}')
+            command1.append(f'https://{username}:{password}@github.com/{org}/{repoName}')
             command1.append(repoPath)
             execute(command1, False)
         else:
@@ -464,7 +508,7 @@ def readLoupeLibraryList():
 
 # Retrieves repo name of a package by fetching data from GitHub
 def getRepoName(package):
-    (error, data) = getLoupePackageData(package)
+    (error, data) = getPackageData(package)
     if error is None:
         fullUrl = data.get('repository', {}).get('html_url', None)
         if fullUrl is None:
@@ -497,7 +541,7 @@ def getAllDependencies(packages):
         # If there is no package.json for this package, assume it's a source library, and that it's already sync'd
         # to the Logical View under Libraries / Loupe.
         else:
-            # Strip it of its @loupeteam prefix.
+            # Strip it of its @<scope> prefix.
             splitPackage = os.path.split(package)[1]
             dependencyData = getLibrarySourceDependencies(os.path.join('.', 'Logical', 'Libraries', 'Loupe', splitPackage))
             print('Source dependencies: ')
@@ -519,17 +563,21 @@ def getAllDependencies(packages):
 def getLibrarySourceDependencies(libraryPath):
     sourceLibrary = ASTools.Library(libraryPath)
     dependencyNames = []
+    # TODO: probe every configured scope rather than only the default scope.
+    # Today this only resolves dependencies that live under the default scope's
+    # registry; cross-scope dependencies need to be encoded explicitly upstream.
+    default_scope = lpm_config.get_default_scope()
     # Install binary dependencies for this library
     for dependency in sourceLibrary.dependencies:
-        # First check to see if it's a custom Loupe lib (if not, ignore it)
+        # First check to see if it's a known package in the default scope (if not, ignore it).
         command = []
         command.append('npm view')
-        command.append(f'@loupeteam/{dependency.name}')
+        command.append(f'{default_scope}/{dependency.name}')
         result = executeAndReturnCode(command)
         if result == 0:
-            print('Dependency found: ' + f'@loupeteam/{dependency.name.lower()}')
+            print('Dependency found: ' + f'{default_scope}/{dependency.name.lower()}')
             # Add this dependency to our list.
-            dependencyNames.append(f'@loupeteam/{dependency.name}'.lower())
+            dependencyNames.append(f'{default_scope}/{dependency.name}'.lower())
     return dependencyNames
 
 def getProgramSourceDependencies(programSourcePath):
@@ -566,21 +614,25 @@ def syncPackages(packages):
 
         elif((packageType == 'program') | (packageType == 'package')):
             destination = getPackageDestination(packageManifest)
-            # Find the module(s) in node_modules, and sync it/them.
-            for module in os.listdir(os.path.join('node_modules', '@loupeteam')):
-                if (os.path.join('@loupeteam', module) == os.path.normpath(package)):
-                    # Get a handle on the folder destination.
-                    destinationPkg = ASTools.Package(destination)
-                    # Create a list of filtered objects that don't get copied over.
-                    filter = ['package.pkg', 'license', 'readme.md', 'package.json', 'changelog.md']
-                    # Loop through all contents in the source directory and copy them over one by one.
-                    for item in os.listdir(os.path.join('node_modules', '@loupeteam', module)):
-                        if (item.lower() not in filter):
-                            # If the item already exists, delete it.
-                            destinationItem = os.path.join(destination, item)
-                            if os.path.exists(destinationItem):
-                                destinationPkg.removeObject(item)
-                            destinationPkg.addObject(os.path.join('node_modules', package, item))
+            # Find the module(s) in node_modules across every configured scope, and sync it/them.
+            for scope in lpm_config.get_scopes().keys():
+                scopeDir = os.path.join('node_modules', scope)
+                if not os.path.isdir(scopeDir):
+                    continue
+                for module in os.listdir(scopeDir):
+                    if (os.path.join(scope, module) == os.path.normpath(package)):
+                        # Get a handle on the folder destination.
+                        destinationPkg = ASTools.Package(destination)
+                        # Create a list of filtered objects that don't get copied over.
+                        filter = ['package.pkg', 'license', 'readme.md', 'package.json', 'changelog.md']
+                        # Loop through all contents in the source directory and copy them over one by one.
+                        for item in os.listdir(os.path.join(scopeDir, module)):
+                            if (item.lower() not in filter):
+                                # If the item already exists, delete it.
+                                destinationItem = os.path.join(destination, item)
+                                if os.path.exists(destinationItem):
+                                    destinationPkg.removeObject(item)
+                                destinationPkg.addObject(os.path.join('node_modules', package, item))
 
         elif(packageType == 'library') or (packageType == None):
             packageDestination = getPackageManifestField(packageManifest, ['lpm', 'logical', 'destination'])
@@ -591,16 +643,20 @@ def syncPackages(packages):
                 destination = os.path.join('Logical', 'Libraries', 'Loupe')
             # Now create the packages in this path that doesn't exist.
             createPackageTree(destination)
-            # Find the module(s) in node_modules, and sync it/them.
-            for module in os.listdir(os.path.join('node_modules', '@loupeteam')):
-                if (os.path.join('@loupeteam', module) == os.path.normpath(package)):
-                    # Get a handle on the library's parent folder.
-                    parentPkg = ASTools.Package(destination)
-                    # If the library already exists, delete it.
-                    libraryPath = os.path.join(destination, module)
-                    if os.path.isdir(libraryPath):
-                        parentPkg.removeObject(module)
-                    parentPkg.addObject(os.path.join('node_modules', package))
+            # Find the module(s) in node_modules across every configured scope, and sync it/them.
+            for scope in lpm_config.get_scopes().keys():
+                scopeDir = os.path.join('node_modules', scope)
+                if not os.path.isdir(scopeDir):
+                    continue
+                for module in os.listdir(scopeDir):
+                    if (os.path.join(scope, module) == os.path.normpath(package)):
+                        # Get a handle on the library's parent folder.
+                        parentPkg = ASTools.Package(destination)
+                        # If the library already exists, delete it.
+                        libraryPath = os.path.join(destination, module)
+                        if os.path.isdir(libraryPath):
+                            parentPkg.removeObject(module)
+                        parentPkg.addObject(os.path.join('node_modules', package))
 
 def deployPackages(config, packages):
     # Figure out where the deployment table is for this configuration.
@@ -701,13 +757,15 @@ def createPackageTree(packages: list):
 
 def createLibraryManifest(package, lpmConfig):
     library = ASTools.Library('.')
+    default_scope = lpm_config.get_default_scope()
+    default_org = lpm_config.get_org_for_scope(default_scope)
     # Create dependencies dictionary for this library
     dependency_dict = {}
     for dependency in library.dependencies:
-        # First check to see if it's a custom Loupe lib (if not, ignore it)
+        # First check to see if it's a known package in the default scope (if not, ignore it).
         cmd = []
         cmd.append('npm view')
-        cmd.append(f'@loupeteam/{dependency.name}')
+        cmd.append(f'{default_scope}/{dependency.name}')
         result = executeAndReturnCode(cmd)
         if result == 0:
             version = []
@@ -717,14 +775,19 @@ def createLibraryManifest(package, lpmConfig):
                 version.append(f'<={library._formatVersionString(dependency.maxVersion)}')
             if len(version) == 0:
                 version.append('*')
-            dependency_dict.update({f'@loupeteam/{dependency.name.lower()}':' '.join(version)})
+            dependency_dict.update({f'{default_scope}/{dependency.name.lower()}':' '.join(version)})
     # Make sure there's a top level description available.
     if (library.description == ''):
-        description = f"Loupe's {package.lower()} library for Automation Runtime"
+        description = f"{package.lower()} library for Automation Runtime"
     else:
         description = library.description
-    # Set the homepage to point to the styleguide
-    homepage = f'https://loupeteam.github.io/LoupeDocs/libraries/{package.lower()}.html'
+    # Set the homepage. Only emit the LoupeDocs URL when publishing under the
+    # @loupeteam scope; other scopes can override later via a future
+    # `docsUrlTemplate` config option.
+    if default_scope == lpm_config.DEFAULT_SCOPE:
+        homepage = f'https://loupeteam.github.io/LoupeDocs/libraries/{package.lower()}.html'
+    else:
+        homepage = ''
     # Ensure the lpmConfig has the proper type set.
     try:
         if lpmConfig['type'] != 'library':
@@ -733,17 +796,17 @@ def createLibraryManifest(package, lpmConfig):
         lpmConfig = { 'type': 'library' }
     # Create dictionary that will hold all values for the package.json file
     manifest_dict = {
-                'name': f'@loupeteam/{package.lower()}',
+                'name': f'{default_scope}/{package.lower()}',
                 'version': library._formatVersionString(library.version),
                 'description': description,
                 'homepage': homepage,
                 'scripts': {},
                 'keywords': [],
-                'author': 'Loupe',
+                'author': default_org,
                 'license': 'MIT',
                 'repository': {
                     'type': 'git',
-                    'url': 'https://github.com/loupeteam/' + package
+                    'url': f'https://github.com/{default_org}/' + package
                 },
                 'lpm': lpmConfig,
                 'dependencies': dependency_dict
@@ -785,91 +848,133 @@ def setPackageManifestField(manifest, fieldName, fieldData):
 
 def printLoupePackageList():
     print("Retrieving package data...")
-    (error, data) = getLoupePackageListData()
+    (error, data) = getPackageListData()
 
-    if not error:
-        packages_sorted = sorted(data, key=lambda x: x["name"])
-
-        # Pre-process package descriptions; these are handled separately, as they can be None.
-        package_descriptions = []
-        for package in packages_sorted:
-            try:
-                if package['repository']['description'] is not None:
-                    package_descriptions.append(package['repository']['description'])
-                else:
-                    package_descriptions.append(" ")
-            except:
-                package_descriptions.append(" ")
-
-        # Determine column widths.
-        name_col_width = max(len(package["name"]) for package in packages_sorted) + 2
-        version_col_width = 12
-        lastmod_col_width = 14
-        description_col_width = max(len(description) for description in package_descriptions)
-
-        # Print the header.
-        print(  "NAME".ljust(name_col_width) +
-                "VERSIONS".ljust(version_col_width) +
-                "LASTUPDATED".ljust(lastmod_col_width) +
-                "DESCRIPTION".ljust(description_col_width))
-        print(  "----".ljust(name_col_width) +
-                "--------".ljust(version_col_width) +
-                "-----------".ljust(lastmod_col_width) +
-                "-----------".ljust(description_col_width))
-
-        for idx, package in enumerate(packages_sorted):
-            print(  package["name"].ljust(name_col_width) +
-                    str(package["version_count"]).ljust(version_col_width) +
-                    package["updated_at"][:10].ljust(lastmod_col_width) +
-                    package_descriptions[idx].ljust(description_col_width))
-    else:
+    if error:
         print(f"Unable to print package list: {error}")
+        return
+
+    if not data:
+        print("No packages found.")
+        return
+
+    packages_sorted = sorted(data, key=lambda x: x["name"])
+
+    # Pre-process package descriptions; these are handled separately, as they can be None.
+    package_descriptions = []
+    for package in packages_sorted:
+        try:
+            if package['repository']['description'] is not None:
+                package_descriptions.append(package['repository']['description'])
+            else:
+                package_descriptions.append(" ")
+        except:
+            package_descriptions.append(" ")
+
+    # Determine column widths.
+    name_col_width = max(len(package["name"]) for package in packages_sorted) + 2
+    scope_col_width = max((len(package.get("_lpm_scope", "")) for package in packages_sorted), default=6) + 2
+    scope_col_width = max(scope_col_width, len("SCOPE") + 2)
+    version_col_width = 12
+    lastmod_col_width = 14
+    description_col_width = max((len(description) for description in package_descriptions), default=len("DESCRIPTION"))
+
+    # Print the header.
+    print(  "NAME".ljust(name_col_width) +
+            "SCOPE".ljust(scope_col_width) +
+            "VERSIONS".ljust(version_col_width) +
+            "LASTUPDATED".ljust(lastmod_col_width) +
+            "DESCRIPTION".ljust(description_col_width))
+    print(  "----".ljust(name_col_width) +
+            "-----".ljust(scope_col_width) +
+            "--------".ljust(version_col_width) +
+            "-----------".ljust(lastmod_col_width) +
+            "-----------".ljust(description_col_width))
+
+    for idx, package in enumerate(packages_sorted):
+        print(  package["name"].ljust(name_col_width) +
+                package.get("_lpm_scope", "").ljust(scope_col_width) +
+                str(package["version_count"]).ljust(version_col_width) +
+                package["updated_at"][:10].ljust(lastmod_col_width) +
+                package_descriptions[idx].ljust(description_col_width))
 
 # Fetches data using GitHub API (See https://docs.github.com/en/rest/packages?apiVersion=2022-11-28#list-packages-for-an-organization)
-# Returns (error, data) tuple, where error is None if all OK and data is a list of package dictionaries (see GitHub's schema)
-def getLoupePackageListData():
+# When `scope` is None, queries every configured scope's org and concatenates the
+# results, tagging each entry with its originating scope under `_lpm_scope`.
+# Returns (error, data) tuple.
+def getPackageListData(scope=None):
     token = getLocalToken()
     headers = { 'Authorization': f'Bearer {token}',
                 'Accept': 'application/vnd.github+json',
                 'X-GitHub-Api-Version': '2022-11-28' }
-    organization = 'loupeteam'
-    page = 1
-    per_page = 100
-    all_packages_gathered = False
+
+    if scope is None:
+        scopes_to_query = list(lpm_config.get_scopes().items())
+    else:
+        info = lpm_config.get_scope_info(scope)
+        if info is None:
+            return (f"Unknown scope: {scope}", [])
+        scopes_to_query = [(scope, info)]
+
     all_packages = []
+    errors = []
+    for scope_name, info in scopes_to_query:
+        organization = info['org']
+        page = 1
+        per_page = 100
+        all_packages_gathered = False
+        while not all_packages_gathered:
+            params = {  'package_type': 'npm',
+                        'page': str(page),
+                        'per_page': str(per_page) }
+            try:
+                r = requests.get(f'https://api.github.com/orgs/{organization}/packages', headers=headers, params=params, timeout=5)
+            except requests.RequestException as exc:
+                errors.append(f"{scope_name} ({organization}): {exc}")
+                break
+            if r.status_code != 200:
+                errors.append(f"{scope_name} ({organization}): status {r.status_code} - {r.text}")
+                break
+            retrieved_packages = json.loads(r.content)
+            for pkg in retrieved_packages:
+                pkg['_lpm_scope'] = scope_name
+            all_packages += retrieved_packages
+            all_packages_gathered = len(retrieved_packages) < per_page
+            page += 1
 
-    while not all_packages_gathered:
-        params = {  'package_type': 'npm',
-                    'page': str(page),
-                    'per_page': str(per_page) }
-        r = requests.get(f'https://api.github.com/orgs/{organization}/packages', headers=headers, params=params, timeout=5)
-        if r.status_code != 200:
-            error = "Status code not OK. Code: " + str(r.status_code) + "\n" + r.text
-            return (error, [])  # Early return
-        retrieved_packages = json.loads(r.content)
-        all_packages += retrieved_packages
-        all_packages_gathered = len(retrieved_packages) < per_page    # All gathered once there are fewer results than full amount
-        page += 1
-
+    if not all_packages and errors:
+        return ("; ".join(errors), [])
+    if errors:
+        # Surface partial failures via stderr-ish print but still return data.
+        print("Warning: some scopes failed to query: " + "; ".join(errors))
     print(f"Retrieved {len(all_packages)} packages total. See below for detailed information.")
     return (None, all_packages)
 
-# Fetches data using GitHub API (See https://docs.github.com/en/rest/packages?apiVersion=2022-11-28#list-packages-for-an-organization)
-# Returns (error, data) tuple, where error is None if all OK and data is a dictionary of the desired package (see GitHub's schema)
-def getLoupePackageData(packageName: str):
+# Backward-compatible alias for callers that still expect the old name.
+def getLoupePackageListData():
+    return getPackageListData()
+
+# Fetches data using GitHub API for a single package; resolves the org from the
+# package's @scope prefix.
+# Returns (error, data) tuple.
+def getPackageData(packageName: str):
     token = getLocalToken()
     headers = { 'Authorization': f'Bearer {token}',
                 'Accept': 'application/vnd.github+json',
                 'X-GitHub-Api-Version': '2022-11-28' }
-    organization = 'loupeteam'
+    organization = lpm_config.org_for_package(packageName)
 
-    packageNameStripped = os.path.split(packageName)[1] # Strip it of its @loupeteam prefix.
+    packageNameStripped = lpm_config.strip_scope(packageName)
     r = requests.get(f'https://api.github.com/orgs/{organization}/packages/npm/{packageNameStripped}', headers=headers, timeout=5)
     if r.status_code != 200:
         error = "Status code not OK. Code: " + str(r.status_code) + "\n" + r.text
         return (error, [])  # Early return
     packageData = json.loads(r.content)
     return (None, packageData)
+
+# Backward-compatible alias.
+def getLoupePackageData(packageName: str):
+    return getPackageData(packageName)
 
 # Run a generic NPM command on the specified packages.
 def runGenericNpmCmd(cmd, packages):
