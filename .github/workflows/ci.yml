@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # Write ~/.npmrc so that `npm whoami` and `npm install` can reach
+      # the GitHub Package Registry.  NPM_TOKEN must be a classic PAT with
+      # the `read:packages` scope, stored as a repository secret.
+      - name: Configure npm authentication
+        shell: pwsh
+        run: |
+          $content = "@loupeteam:registry=https://npm.pkg.github.com`n//npm.pkg.github.com/:_authToken=${{ secrets.NPM_TOKEN }}"
+          Set-Content -Path "$env:USERPROFILE\.npmrc" -Value $content
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Run tests
+        # test_build_intel / test_build_arm require Automation Studio to be
+        # installed locally and are excluded from CI.
+        run: python -m pytest test/test_lpm.py -v -k "not test_build"
