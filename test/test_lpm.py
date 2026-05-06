@@ -148,6 +148,35 @@ class TestLpm:
         finally:
             monkeypatch.undo()
 
+    def test_hoist_no_auth_check_after_subcommand(self):
+        """--no-auth-check placed after the subcommand should be hoisted."""
+        hoisted = LPM._hoist_global_flags(["install", "somepkg", "--no-auth-check"])
+        assert hoisted == ["--no-auth-check", "install", "somepkg"]
+
+    def test_hoist_parse_no_auth_check_after_subcommand(self, monkeypatch):
+        """lpm install --no-auth-check should parse without error and set no_auth_check=True."""
+        monkeypatch.chdir(self.test_dir)
+        try:
+            parser, sub = LPM._build_parser("LPM")
+            raw_args = LPM._hoist_global_flags(["install", "--no-auth-check"])
+            ns = parser.parse_args(raw_args)
+            assert ns.no_auth_check is True
+            assert ns.cmd == "install"
+        finally:
+            monkeypatch.undo()
+
+    def test_login_no_check_deprecated_alias(self, monkeypatch):
+        """lpm login --no-check should still parse (backwards compat); no_auth_check unset."""
+        monkeypatch.chdir(self.test_dir)
+        try:
+            parser, sub = LPM._build_parser("LPM")
+            ns = parser.parse_args(["login", "--no-check"])
+            assert ns.no_check is True
+            # no_auth_check is the new global flag; --no-check does not set it
+            assert ns.no_auth_check is False
+        finally:
+            monkeypatch.undo()
+
     # Prior to installing atn, install 1 of 3 dependencies
     def test_stringext_install(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "stringext"])
