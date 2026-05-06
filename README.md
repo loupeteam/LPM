@@ -18,5 +18,18 @@ LPM is the Loupe Package Manager. This tool is designed to make it easy to inter
 
 Documentation for LPM use, including detailed installation instructions and use cases, can be found [here](https://loupeteam.github.io/LoupeDocs/tools/lpm.html). 
 
+## Releasing a new version
+
+`package.json` is the single source of truth for the LPM version — `LPM.py` reads it at runtime, and the GitHub release workflow validates that the pushed tag matches it.
+
+To cut a release:
+
+```sh
+npm version patch       # or: minor, major, or an explicit version like 1.3.0 / 1.3.0-beta.1
+git push --follow-tags
+```
+
+`npm version` bumps `package.json`, creates a commit, and tags `v<version>` in one atomic step. Pushing the tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which publishes the package to the GitHub npm registry and creates a GitHub Release.
+
 ## Licensing
 This project is licensed under the [MIT License](LICENSE.md). 
