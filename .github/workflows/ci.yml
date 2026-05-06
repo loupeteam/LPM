@@ -23,18 +23,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest
 
       # Write ~/.npmrc so that `npm whoami` and `npm install` can reach
-      # the GitHub Package Registry.  NPM_TOKEN must be a classic PAT with
+      # the GitHub Package Registry.  LPM_TOKEN must be a classic PAT with
       # the `read:packages` scope, stored as a repository secret.
       - name: Configure npm authentication
         shell: pwsh
         run: |
-          $content = "@loupeteam:registry=https://npm.pkg.github.com`n//npm.pkg.github.com/:_authToken=${{ secrets.NPM_TOKEN }}"
+          $content = "@loupeteam:registry=https://npm.pkg.github.com`n//npm.pkg.github.com/:_authToken=${{ secrets.LPM_TOKEN }}"
           Set-Content -Path "$env:USERPROFILE\.npmrc" -Value $content
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          LPM_TOKEN: ${{ secrets.LPM_TOKEN }}
 
       - name: Run tests
         # test_build_intel / test_build_arm require Automation Studio to be
