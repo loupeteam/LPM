@@ -28,7 +28,7 @@ with open(version_file, "r") as f:
 
 __author__ = 'Andrew Musser'
 
-from aspython import ASTools
+import aspython as ASTools
 
 # Core LPM functionality. The CLI delegates to functions defined in lpm_core.
 from lpm_core import *
