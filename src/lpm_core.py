@@ -25,7 +25,7 @@ import requests
 
 from termcolor import colored, cprint
 
-from ASPython import ASTools
+from aspython import ASTools
 
 
 def isAuthenticated():
