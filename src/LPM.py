@@ -37,7 +37,7 @@ from lpm_core import *
 # subcommand for argparse to recognise them.  Centralised here so that
 # _hoist_global_flags(), the fallback parser, and any future code all stay
 # in sync automatically.
-_GLOBAL_FLAG_SPELLINGS = {'-s', '--silent', '-nc', '--nocolor', '--no-auth-check'}
+_GLOBAL_FLAG_SPELLINGS = {'-s', '--silent', '-nc', '--nocolor'}
 
 
 # ---------------------------------------------------------------------------
@@ -103,11 +103,7 @@ def cmd_login(args):
         cprint('Please follow the prompts below to log in using valid GitHub credentials.', 'yellow')
         token = input(colored('? ', 'green') + 'Enter your personal access token: ')
         login(token)
-    if getattr(args, 'no_check', False):
-        cprint('Warning: --no-check is deprecated; use --no-auth-check instead.', 'yellow')
-    if getattr(args, 'no_auth_check', False) or getattr(args, 'no_check', False):
-        print('Credentials stored (authentication check skipped).')
-    elif isAuthenticated():
+    if isAuthenticated():
         print(colored(f'New credentials for {getAuthenticatedUser()} successfully stored.', 'green'))
     else:
         print(colored('Error: invalid credentials. Please try again.', 'red'))
@@ -415,8 +411,6 @@ def _build_parser(prog_name):
                         help='Execute commands silently with default values and no operator prompts')
     parser.add_argument('-nc', '--nocolor', action='store_true',
                         help="Don't color the output - to avoid dependency on termcolor")
-    parser.add_argument('--no-auth-check', action='store_true', dest='no_auth_check',
-                        help='Skip the authentication check before running the command (useful for CI machine tokens)')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s: ' + __version__)
 
     sub = parser.add_subparsers(dest='cmd', metavar='command')
@@ -424,8 +418,6 @@ def _build_parser(prog_name):
     # login
     p = sub.add_parser('login', help='Authenticate with the GitHub package registry')
     p.add_argument('-t', '--token', type=str, help='Personal Access Token required for silent login')
-    p.add_argument('--no-check', action='store_true', dest='no_check',
-                   help='(Deprecated, use --no-auth-check) Skip the post-login authentication check')
     p.set_defaults(func=cmd_login)
 
     # logout
@@ -579,7 +571,6 @@ def main():
         # Keep these in sync with _GLOBAL_FLAG_SPELLINGS.
         fallback.add_argument('-s', '--silent', action='store_true')
         fallback.add_argument('-nc', '--nocolor', action='store_true')
-        fallback.add_argument('--no-auth-check', action='store_true', dest='no_auth_check')
         ns, leftover = fallback.parse_known_args(raw_args)
         ns.cmd = leftover[0] if leftover else ''
         ns.packages = leftover[1:]
@@ -602,7 +593,7 @@ def main():
         return
 
     # Auth gate.
-    if ns.cmd not in _NO_AUTH and not getattr(ns, 'no_auth_check', False) and not isAuthenticated():
+    if ns.cmd not in _NO_AUTH and not isAuthenticated():
         cprint('No credentials found. Please call lpm login before attempting other operations.', 'yellow')
         return
 
