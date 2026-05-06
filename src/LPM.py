@@ -25,6 +25,7 @@ import aspython as ASTools
 # Core LPM functionality. The CLI delegates to functions defined in lpm_core.
 from lpm_core import *
 
+
 def _load_version():
     here = os.path.dirname(__file__)
     # In a source/npm checkout, package.json is one level up from src/.
