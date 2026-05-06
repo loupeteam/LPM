@@ -52,7 +52,7 @@ class TestLpm:
         if not os.path.exists(LPM_AS_TEMPLATE_PATH):
             os.mkdir(LPM_AS_TEMPLATE_PATH)
 
-        # determine if already set up with library bulder project
+        # determine if already set up with library builder project
         try:
             with open(os.path.join(LPM_AS_TEMPLATE_PATH, 'package.json')) as p:
                 package_dict = json.load(p)
