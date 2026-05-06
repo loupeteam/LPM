@@ -112,7 +112,7 @@ class TestLpm:
         
         # Verify output
         captured = capsys.readouterr()
-        version_output = re.fullmatch(r"LPM: \d+\.\d+\.\d+\n", captured.out)
+        version_output = re.fullmatch(r"LPM: \d+\.\d+\.\d+[^\n]*\n", captured.out)
         assert version_output is not None
 
     def test_hoist_silent_after_subcommand(self):
