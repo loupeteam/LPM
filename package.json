@@ -1,0 +1,31 @@
+{
+  "name": "@loupeteam/lpm",
+  "version": "1.2.0-beta.1",
+  "description": "LPM - Loupe Package Manager. A lightweight wrapper around NPM that processes Loupe packages.",
+  "homepage": "https://loupeteam.github.io/LoupeDocs/tools/lpm.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loupeteam/LPM.git"
+  },
+  "bin": {
+    "lpm": "bin/lpm.js"
+  },
+  "author": "Loupe",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "src/",
+    "requirements.txt",
+    "docs/",
+    "files/",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}
