@@ -1,5 +1,10 @@
 # Change log
 
+- 1.0.6 - Fix installation of packages as source. 
+        - Add pytesting infrastructure.
+        
+- 1.0.5 - Update dependencies via Dependabot. Rework Github Action workflow.
+
 - 1.0.4 - Address SyntaxWarning that pops up in Python 3.12
 
 - 1.0.3 - Address bug related to version file path
