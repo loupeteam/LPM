@@ -23,7 +23,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt pytest
+        run: |
+          pip install -r requirements.txt pytest
+          pip install ./src/ASPython
 
       # Write ~/.npmrc so that `npm whoami` and `npm install` can reach
       # the GitHub Package Registry.  LPM_TOKEN must be a classic PAT with
