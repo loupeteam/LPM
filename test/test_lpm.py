@@ -7,17 +7,17 @@ from datetime import datetime
 
 import pytest
 
-sys.path.insert(0, "./src")
+sys.path.insert(0, './src')
 import LPM
 
-sys.path.insert(0, "./src/ASPython")
+sys.path.insert(0, './src/ASPython')
 import ASTools
 
-LPM_AS_TEMPLATE_FOLDER_NAME = "asproject_template_librarybuilderproject"
-LPM_AS_TEMPLATE_PATH = os.path.join("./test/", LPM_AS_TEMPLATE_FOLDER_NAME)
+LPM_AS_TEMPLATE_FOLDER_NAME = 'asproject_template_librarybuilderproject'
+LPM_AS_TEMPLATE_PATH = os.path.join('./test/', LPM_AS_TEMPLATE_FOLDER_NAME)
+
 
 class TestLpm:
-    
     @classmethod
     def setup_class(cls):
         # Code to run before each test method
@@ -27,44 +27,44 @@ class TestLpm:
 
         # create temporary folder
         now = datetime.now()
-        timestamp = now.strftime("%y%m%d-%H-%M-%S")
+        timestamp = now.strftime('%y%m%d-%H-%M-%S')
         test_folder = timestamp
-        cls.test_dir = os.path.join("./temp/", test_folder)
+        cls.test_dir = os.path.join('./temp/', test_folder)
 
         # Source directory
         asproject_template_source = LPM_AS_TEMPLATE_PATH
 
         # Copy the entire directory tree, allowing existing destination
         shutil.copytree(asproject_template_source, cls.test_dir, dirs_exist_ok=True)
-        print(f"Copied template to test folder: {cls.test_dir}")
+        print(f'Copied template to test folder: {cls.test_dir}')
 
     @classmethod
     def teardown_class(cls):
         # Code to run after each test method
 
         # shutil.rmtree(cls.test_dir)
-        print("Teardown code")
-    
+        print('Teardown code')
+
     @classmethod
     def ensure_as_template_exists(cls):
-        
+
         # ensure template folder exists
         if not os.path.exists(LPM_AS_TEMPLATE_PATH):
             os.mkdir(LPM_AS_TEMPLATE_PATH)
-        
-        # determine if already set up with library bulder project 
+
+        # determine if already set up with library bulder project
         try:
-            with open(os.path.join(LPM_AS_TEMPLATE_PATH, "package.json")) as p:
+            with open(os.path.join(LPM_AS_TEMPLATE_PATH, 'package.json')) as p:
                 package_dict = json.load(p)
-                if "@loupeteam/librarybuilderproject" in package_dict["dependencies"]:
+                if '@loupeteam/librarybuilderproject' in package_dict['dependencies']:
                     template_reinit_required = False
                 else:
                     template_reinit_required = True
         except:
             template_reinit_required = True
-        
+
         if template_reinit_required:
-            print("No template found. Creating...")
+            print('No template found. Creating...')
 
             # delete everything inside the template folder, if any (to start afresh)
             for filename in os.listdir(LPM_AS_TEMPLATE_PATH):
@@ -79,84 +79,84 @@ class TestLpm:
 
             monkeypatch = pytest.MonkeyPatch()
 
-            # lpm init        
+            # lpm init
             monkeypatch.chdir(path=LPM_AS_TEMPLATE_PATH)
-            monkeypatch.setattr(sys, "argv", ["lpm.py", "--silent", "init"])
+            monkeypatch.setattr(sys, 'argv', ['lpm.py', '--silent', 'init'])
             LPM.main()
 
             # lpm install library builder project
-            monkeypatch.setattr(sys, "argv", ["lpm.py", "--silent", "install", "librarybuilderproject"])
+            monkeypatch.setattr(sys, 'argv', ['lpm.py', '--silent', 'install', 'librarybuilderproject'])
             LPM.main()
-            
+
             monkeypatch.undo()
-            
+
             # Manually modify package.json (avoid dealing with console prompting with "lpm configure")
-            with open(os.path.join(LPM_AS_TEMPLATE_PATH, "package.json"), 'r') as p:
+            with open(os.path.join(LPM_AS_TEMPLATE_PATH, 'package.json'), 'r') as p:
                 package_dict = json.load(p)
-            package_dict["lpmConfig"] = {"deploymentConfigs": ["Intel", "Arm"], "gitClient": "GitExtensions"}
-            with open(os.path.join(LPM_AS_TEMPLATE_PATH, "package.json"), 'w') as p:
+            package_dict['lpmConfig'] = {'deploymentConfigs': ['Intel', 'Arm'], 'gitClient': 'GitExtensions'}
+            with open(os.path.join(LPM_AS_TEMPLATE_PATH, 'package.json'), 'w') as p:
                 json.dump(package_dict, p, indent=2)
 
-            print("Template creation complete.")
+            print('Template creation complete.')
 
         else:
-            print("Template found. No need to (re)create.")
+            print('Template found. No need to (re)create.')
 
     def test_version(self, capsys, monkeypatch):
 
         # argparse will exit from within for version, so we need the pytest context manager
         with pytest.raises(SystemExit):
-            monkeypatch.setattr(sys, "argv", ["lpm.py", "-v"])
+            monkeypatch.setattr(sys, 'argv', ['lpm.py', '-v'])
             LPM.main()
-        
+
         # Verify output
         captured = capsys.readouterr()
-        version_output = re.fullmatch(r"LPM: \d+\.\d+\.\d+[^\n]*\n", captured.out)
+        version_output = re.fullmatch(r'LPM: \d+\.\d+\.\d+[^\n]*\n', captured.out)
         assert version_output is not None
 
     def test_hoist_silent_after_subcommand(self):
         """--silent placed after the subcommand should be accepted, not error."""
-        hoisted = LPM._hoist_global_flags(["install", "--silent"])
-        assert hoisted == ["--silent", "install"]
+        hoisted = LPM._hoist_global_flags(['install', '--silent'])
+        assert hoisted == ['--silent', 'install']
 
     def test_hoist_silent_after_subcommand_with_package(self):
         """--silent placed after packages should be hoisted before the subcommand."""
-        hoisted = LPM._hoist_global_flags(["install", "somepkg", "--silent"])
-        assert hoisted == ["--silent", "install", "somepkg"]
+        hoisted = LPM._hoist_global_flags(['install', 'somepkg', '--silent'])
+        assert hoisted == ['--silent', 'install', 'somepkg']
 
     def test_hoist_nocolor_after_subcommand(self):
         """-nc/--nocolor placed after the subcommand should be hoisted."""
-        hoisted = LPM._hoist_global_flags(["install", "somepkg", "--nocolor"])
-        assert hoisted == ["--nocolor", "install", "somepkg"]
+        hoisted = LPM._hoist_global_flags(['install', 'somepkg', '--nocolor'])
+        assert hoisted == ['--nocolor', 'install', 'somepkg']
 
     def test_hoist_flag_before_subcommand_unchanged(self):
         """Flags already before the subcommand should not be moved."""
-        hoisted = LPM._hoist_global_flags(["--silent", "install", "somepkg"])
-        assert hoisted == ["--silent", "install", "somepkg"]
+        hoisted = LPM._hoist_global_flags(['--silent', 'install', 'somepkg'])
+        assert hoisted == ['--silent', 'install', 'somepkg']
 
     def test_hoist_parse_silent_after_subcommand(self, monkeypatch):
         """lpm install --silent should parse without error and set silent=True."""
-        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "--silent"])
+        monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', '--silent'])
         monkeypatch.chdir(self.test_dir)
         try:
-            parser, sub = LPM._build_parser("LPM")
-            raw_args = LPM._hoist_global_flags(["install", "--silent"])
+            parser, sub = LPM._build_parser('LPM')
+            raw_args = LPM._hoist_global_flags(['install', '--silent'])
             ns = parser.parse_args(raw_args)
             assert ns.silent is True
-            assert ns.cmd == "install"
+            assert ns.cmd == 'install'
         finally:
             monkeypatch.undo()
 
     # Prior to installing atn, install 1 of 3 dependencies
     def test_stringext_install(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "stringext"])
+        monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', 'stringext'])
         monkeypatch.chdir(self.test_dir)
         try:
             LPM.main()
 
-            with open("package.json") as p:
+            with open('package.json') as p:
                 package_dict = json.load(p)
-                assert "@loupeteam/stringext" in package_dict["dependencies"]
+                assert '@loupeteam/stringext' in package_dict['dependencies']
         finally:
             monkeypatch.undo()
 
@@ -166,70 +166,70 @@ class TestLpm:
 
         try:
             # Attempt invalid version
-            version_invalid = "0.99.9"
-            monkeypatch.setattr(sys, "argv", ["lpm.py", "install", f"vartools@{version_invalid}"])
+            version_invalid = '0.99.9'
+            monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', f'vartools@{version_invalid}'])
 
             LPM.main()
             captured = capsys.readouterr()
-            
+
             print(captured.out)
-            err_match = re.search(r"Error while attempting to install package", captured.out)
+            err_match = re.search(r'Error while attempting to install package', captured.out)
             assert err_match is not None
 
             # Attempt valid version
-            version_valid = "0.11.3"
-            monkeypatch.setattr(sys, "argv", ["lpm.py", "install", f"vartools@{version_valid}"])
-        
+            version_valid = '0.11.3'
+            monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', f'vartools@{version_valid}'])
+
             LPM.main()
 
-            with open("package.json") as p:
+            with open('package.json') as p:
                 package_dict = json.load(p)
-                assert "@loupeteam/vartools" in package_dict["dependencies"]
-                assert version_valid in package_dict["dependencies"]["@loupeteam/vartools"]
-        
+                assert '@loupeteam/vartools' in package_dict['dependencies']
+                assert version_valid in package_dict['dependencies']['@loupeteam/vartools']
+
         finally:
             monkeypatch.undo()
 
     def test_atn_install_as_src(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "atn", "-src"])
+        monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', 'atn', '-src'])
         monkeypatch.chdir(self.test_dir)
         try:
             LPM.main()
 
-            source_info_path = os.path.join(".", "TempObjects", "sourceInfo.json")
+            source_info_path = os.path.join('.', 'TempObjects', 'sourceInfo.json')
             assert os.path.exists(source_info_path)
-            
+
             with open(source_info_path) as s:
                 source_info_dict = json.load(s)
-                assert "@loupeteam/atn" in source_info_dict
+                assert '@loupeteam/atn' in source_info_dict
         finally:
             monkeypatch.undo()
 
     def test_revinfoprog_install_as_src(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "revinfoprog", "--source"])
+        monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', 'revinfoprog', '--source'])
         monkeypatch.chdir(self.test_dir)
         try:
             LPM.main()
-            
-            source_info_path = os.path.join(".", "TempObjects", "sourceInfo.json")
+
+            source_info_path = os.path.join('.', 'TempObjects', 'sourceInfo.json')
             assert os.path.exists(source_info_path)
-            
+
             with open(source_info_path) as s:
                 source_info_dict = json.load(s)
-                assert "@loupeteam/revinfoprog" in source_info_dict
+                assert '@loupeteam/revinfoprog' in source_info_dict
         finally:
             monkeypatch.undo()
 
     # Install a representative program (not as source)
     def test_luxprog_install(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["lpm.py", "install", "luxprog"])
+        monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install', 'luxprog'])
         monkeypatch.chdir(self.test_dir)
         try:
             LPM.main()
 
-            with open("package.json") as p:
+            with open('package.json') as p:
                 package_dict = json.load(p)
-                assert "@loupeteam/luxprog" in package_dict["dependencies"]
+                assert '@loupeteam/luxprog' in package_dict['dependencies']
         finally:
             monkeypatch.undo()
 
@@ -238,38 +238,40 @@ class TestLpm:
         monkeypatch.chdir(self.test_dir)
         try:
             # Pre-condition: package.json must already have dependencies (added by prior install tests).
-            with open("package.json") as p:
+            with open('package.json') as p:
                 package_dict = json.load(p)
-            deps = package_dict.get("dependencies", {})
-            assert deps, "Pre-condition: package.json must have dependencies"
+            deps = package_dict.get('dependencies', {})
+            assert deps, 'Pre-condition: package.json must have dependencies'
 
             from unittest.mock import patch
 
-            with patch("LPM.installPackages"), \
-                 patch("LPM.getAllDependencies", return_value=list(deps.keys())) as mock_get_all_deps, \
-                 patch("LPM.syncPackages") as mock_sync, \
-                 patch("LPM.deployPackages") as mock_deploy:
-                monkeypatch.setattr(sys, "argv", ["lpm.py", "install"])
+            with (
+                patch('LPM.installPackages'),
+                patch('LPM.getAllDependencies', return_value=list(deps.keys())) as mock_get_all_deps,
+                patch('LPM.syncPackages') as mock_sync,
+                patch('LPM.deployPackages') as mock_deploy,
+            ):
+                monkeypatch.setattr(sys, 'argv', ['lpm.py', 'install'])
                 LPM.main()
 
             # getAllDependencies must have been called with the resolved package list,
             # not an empty list (which would make sync/deploy a no-op – the original bug).
-            assert mock_get_all_deps.called, "getAllDependencies was not called"
+            assert mock_get_all_deps.called, 'getAllDependencies was not called'
             call_packages = mock_get_all_deps.call_args_list[0][0][0]
             assert len(call_packages) > 0, (
-                "getAllDependencies was called with an empty list; "
-                "sync/deploy would be a no-op (regression of the no-args install bug)"
+                'getAllDependencies was called with an empty list; '
+                'sync/deploy would be a no-op (regression of the no-args install bug)'
             )
-            assert mock_sync.called, "syncPackages was not called"
-            assert mock_deploy.called, "deployPackages was not called"
+            assert mock_sync.called, 'syncPackages was not called'
+            assert mock_deploy.called, 'deployPackages was not called'
         finally:
             monkeypatch.undo()
 
     def test_build_intel(self, monkeypatch):
         monkeypatch.chdir(self.test_dir)
         try:
-            project = ASTools.Project(".")
-            build_result = project.build("Intel")
+            project = ASTools.Project('.')
+            build_result = project.build('Intel')
             assert build_result.returncode == 0 or build_result.returncode == 1  # 0: no issues, 1: warnings only
         finally:
             monkeypatch.undo()
@@ -277,14 +279,8 @@ class TestLpm:
     def test_build_arm(self, monkeypatch):
         monkeypatch.chdir(self.test_dir)
         try:
-            project = ASTools.Project(".")
-            build_result = project.build("Arm")
+            project = ASTools.Project('.')
+            build_result = project.build('Arm')
             assert build_result.returncode == 0 or build_result.returncode == 1  # 0: no issues, 1: warnings only
         finally:
             monkeypatch.undo()
-
-
-
-
-
-
