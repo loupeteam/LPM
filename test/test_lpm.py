@@ -1,18 +1,17 @@
-import pytest
+import json
 import os
-import sys
-from datetime import datetime
 import re
 import shutil
-import json
+import sys
+from datetime import datetime
+
+import pytest
 
 sys.path.insert(0, "./src")
 import LPM
 
-
 sys.path.insert(0, "./src/ASPython")
 import ASTools
-
 
 LPM_AS_TEMPLATE_FOLDER_NAME = "asproject_template_librarybuilderproject"
 LPM_AS_TEMPLATE_PATH = os.path.join("./test/", LPM_AS_TEMPLATE_FOLDER_NAME)

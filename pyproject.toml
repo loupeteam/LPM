@@ -1,0 +1,24 @@
+[tool.ruff]
+target-version = "py312"
+# TODO: tighten line-length back toward 88/100 once existing long lines are wrapped.
+line-length = 120
+extend-exclude = ["src/ASPython"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors (PEP 8)
+    "W",   # pycodestyle warnings (PEP 8)
+    "F",   # pyflakes (unused imports, undefined names)
+    "I",   # isort (import sorting)
+]
+# TODO: replace bare `except:` with explicit exception types and remove E722 ignore.
+# TODO: wrap or shorten the long lines (mostly user-facing prompts) and remove E501 ignore.
+ignore = ["E722", "E501"]
+
+# TODO: replace `from lpm_core import *` in src/LPM.py with explicit imports
+# (or `import lpm_core` + qualified calls) and drop the F403/F405 ignores.
+[tool.ruff.lint.per-file-ignores]
+"src/LPM.py" = ["F403", "F405"]
+
+[tool.ruff.format]
+quote-style = "single"

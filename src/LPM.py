@@ -4,8 +4,7 @@
  * https://loupe.team
  *
  * This file is part of LPM, licensed under the MIT License.
-'''
-'''
+
 LPM
 This is a lightweight wrapper around NPM that processes Loupe packages.
 
@@ -13,13 +12,18 @@ This file contains the command-line interface only. The underlying
 functionality lives in lpm_core.py.
 '''
 
-import os.path
-import json
-import sys
 import argparse
-import logging
 import ctypes
+import json
+import logging
+import os.path
+import sys
 import time
+
+import aspython as ASTools
+
+# Core LPM functionality. The CLI delegates to functions defined in lpm_core.
+from lpm_core import *
 
 version_file = os.path.normpath(os.path.join(os.path.dirname(__file__), 'version.json'))
 with open(version_file, "r") as f:
@@ -27,11 +31,6 @@ with open(version_file, "r") as f:
     __version__ = data["version"]
 
 __author__ = 'Andrew Musser'
-
-import aspython as ASTools
-
-# Core LPM functionality. The CLI delegates to functions defined in lpm_core.
-from lpm_core import *
 
 # Spellings of flags that are global (top-level) and must appear before the
 # subcommand for argparse to recognise them.  Centralised here so that
@@ -354,7 +353,7 @@ def cmd_publish(args):
         cprint('Error: the package name must include the @loupeteam scope prefix.', 'yellow')
         return
     try:
-        repoUrl = data['repository']['url']  # triggers an exception if missing
+        data['repository']['url']  # triggers an exception if missing
     except:
         cprint('Error: the package.json file must include a repository parameter', 'yellow')
         cprint('For example:', 'yellow')
@@ -580,7 +579,8 @@ def main():
 
     # Configure output coloring now that --nocolor is known.
     if not ns.nocolor:
-        from termcolor import colored as _colored, cprint as _cprint
+        from termcolor import colored as _colored
+        from termcolor import cprint as _cprint
         colored = _colored
         cprint = _cprint
     else:

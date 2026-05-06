@@ -4,8 +4,7 @@
  * https://loupe.team
  *
  * This file is part of LPM, licensed under the MIT License.
-'''
-'''
+
 LPM core functionality.
 
 This module contains the underlying package-management, authentication, manifest
@@ -14,15 +13,14 @@ LPM.py and is responsible for argument parsing and user-facing output;
 everything else lives here so it can be reused and tested in isolation.
 '''
 
+import json
 import os
 import os.path
-import json
+import re
 import shutil
 import subprocess
-import sys
-import re
-import requests
 
+import requests
 from termcolor import colored, cprint
 
 import aspython as ASTools
@@ -71,7 +69,6 @@ def importLibraries():
     try:
         loupePkg = ASTools.Package('./Logical/Libraries/Loupe')
     except:
-        err = sys.exc_info()
         print('Loupe folder not found, trying _ARG...')
         try:
             loupePkg = ASTools.Package('./Logical/Libraries/_ARG')
@@ -137,13 +134,14 @@ def configureProject(args):
         print('Configuration options are only supported at the root level of a project')
         return
     deploymentConfigs = getPackageManifestField('package.json', ['lpmConfig', 'deploymentConfigs'])
-    if(deploymentConfigs == None): deploymentConfigs = []
+    if deploymentConfigs is None:
+        deploymentConfigs = []
     if (args.nocolor) or (args.silent):
         print('Support for interactive prompts is disabled. Default values will be assigned to the package.json file.')
         print('All configurations in the project are being assigned as deployment targets: ' + ' '.join(project.buildConfigNames))
         setPackageManifestField('package.json', 'deploymentConfigs', project.buildConfigNames)
     else:
-        from InquirerPy import inquirer, get_style
+        from InquirerPy import get_style, inquirer
         from InquirerPy.base.control import Choice
 
         # Config question #1: Deployment configurations.
@@ -170,7 +168,8 @@ def configureProject(args):
         # Config question #2: Configure a Git client.
         # Check to see if there already is a configuration, and if so display that.
         gitClient = getPackageManifestField('package.json', ['lpmConfig', 'gitClient'])
-        if(gitClient == None): gitClient = ''
+        if gitClient is None:
+            gitClient = ''
         availableClients = ['GitExtensions', 'GitKraken', 'SourceTree', ''] # Note that these are available but not all supported (=
         configOptions = []
         for client in availableClients:
@@ -199,22 +198,22 @@ def getPackageType(path):
         # First check for the lpm->type metadata.
         packageType = getPackageManifestField(manifestFilePath, ['lpm', 'type'])
     # If the field is not present, or the file is not present, then search manually for an indicative file extension.
-    if (packageType == None):
+    if (packageType is None):
         try:
-            project = ASTools.Project(path)
+            ASTools.Project(path)
             packageType = 'project'
         except:
             try:
-                library = ASTools.Library(path)
+                ASTools.Library(path)
                 packageType = 'library'
             except:
                 try:
-                    package = ASTools.Package(path)
+                    ASTools.Package(path)
                     packageType = 'program'
                 except:
                     # Getting here means no matches were found.
                     packageType = None
-    if packageType == None:
+    if packageType is None:
         return 'undefined'
     else:
         return packageType
@@ -324,7 +323,7 @@ def installSource(package, version, sourceDependencies=None):
 def getPackageDestination(packageManifestPath):
     manifestPackageDestination = getPackageManifestField(packageManifestPath, ['lpm', 'logical', 'destination'])
     # If an explicit destination exists, use that. Otherwise default to Logical root.
-    if manifestPackageDestination != None:
+    if manifestPackageDestination is not None:
         packageDestination = os.path.join('Logical', manifestPackageDestination)
     else:
         packageDestination = 'Logical'
@@ -492,7 +491,7 @@ def getAllDependencies(packages):
         # If package.json exists, get dependencies from there.
         if(os.path.exists(os.path.join('node_modules', package, 'package.json'))):
             dependencyData = getPackageManifestField(os.path.join('node_modules', package, 'package.json'), ['dependencies'])
-            if(dependencyData == None):
+            if(dependencyData is None):
                 dependencyData = []
         # If there is no package.json for this package, assume it's a source library, and that it's already sync'd
         # to the Logical View under Libraries / Loupe.
@@ -560,7 +559,7 @@ def syncPackages(packages):
             # Copy starter project into root directory.
             shutil.copytree(os.path.join('node_modules', package), '.', dirs_exist_ok=True)
 
-        elif(project == None):
+        elif(project is None):
             # Skip sync'ing of other types (packages or libraries) if we're not in a project.
             pass
 
@@ -582,10 +581,10 @@ def syncPackages(packages):
                                 destinationPkg.removeObject(item)
                             destinationPkg.addObject(os.path.join('node_modules', package, item))
 
-        elif(packageType == 'library') or (packageType == None):
+        elif(packageType == 'library') or (packageType is None):
             packageDestination = getPackageManifestField(packageManifest, ['lpm', 'logical', 'destination'])
             # If an explicit destination exists, use that. Otherwise default to Logical root.
-            if packageDestination != None:
+            if packageDestination is not None:
                 destination = os.path.join('Logical', packageDestination)
             else:
                 destination = os.path.join('Logical', 'Libraries', 'Loupe')
@@ -616,9 +615,9 @@ def deployPackages(config, packages):
             packageType = getPackageManifestField(packageManifest, ['lpm', 'type'])
 
             # Do something different based on package type.
-            if(packageType == 'library') or (packageType == None):
+            if(packageType == 'library') or (packageType is None):
                 libraryLocation = getPackageManifestField(packageManifest, ['lpm', 'logical', 'destination'])
-                if (libraryLocation == None):
+                if (libraryLocation is None):
                     libraryLocation = os.path.join('Libraries', 'Loupe')
                 libraryAttributes = getLibraryAttributes(packageManifest, config)
                 # Deploy the required library.
@@ -628,13 +627,13 @@ def deployPackages(config, packages):
                 cpuDeployment = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
                 taskLocation = getPackageDestination(packageManifest)
                 # First deploy all configured tasks.
-                if cpuDeployment != None:
+                if cpuDeployment is not None:
                     for item in cpuDeployment:
                         deploymentTable.deployTask(taskLocation, item['source'], item['destination'])
                 # Next perform additional configuration changes.
                 # Set the pre-build step if it exists.
                 preBuildCommand = getPackageManifestField(packageManifest, ['lpm', 'physical', 'configuration', 'preBuildStep'])
-                if (preBuildCommand != None):
+                if (preBuildCommand is not None):
                     configPackage.setPreBuildStep(preBuildCommand)
 
         # No package.json is present in node_modules - so it's a source library.
@@ -662,26 +661,26 @@ def deployPackages(config, packages):
 
                 logicalPackagePath = os.path.normpath(packageSourceInfo['logicalPath'])
 
-                if cpuDeployment != None:
+                if cpuDeployment is not None:
                     for item in cpuDeployment:
                         deploymentTable.deployTask(logicalPackagePath, item['source'], item['destination'])
 
 def getLibraryAttributes(packageManifest, config):
     libraryCpus = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
     try:
-        if (type(libraryCpus) == list):
+        if isinstance(libraryCpus, list):
             for cpu in libraryCpus:
                 try:
                     if(cpu['config'].lower() == config.lower()):
                         return cpu['attributes']
-                except Exception as e:
+                except Exception:
                     return cpu['attributes']
         else:
             try:
                 return libraryCpus['attributes']
-            except Exception as e:
+            except Exception:
                 return {}
-    except Exception as e:
+    except Exception:
         return {}
     return {}
 
@@ -692,12 +691,12 @@ def createPackageTree(packages: list):
     for i in range(len(packageList)):
         try:
             # Check for package existence.
-            pkg = ASTools.Package(os.path.join(*packageList[:i+1]))
+            ASTools.Package(os.path.join(*packageList[:i+1]))
         except:
             # Package does not exist, so create it.
             # First retrieve handle of its parent package.
             parentPkg = ASTools.Package(os.path.join(*packageList[:i]))
-            pkg = parentPkg.addEmptyPackage(packageList[i])
+            parentPkg.addEmptyPackage(packageList[i])
 
 def createLibraryManifest(package, lpmConfig):
     library = ASTools.Library('.')
@@ -775,7 +774,7 @@ def setPackageManifestField(manifest, fieldName, fieldData):
     data = json.load(readFile)
     readFile.close()
     # If the lpmConfig key isn't in there yet, add it first.
-    if(not "lpmConfig" in data):
+    if("lpmConfig" not in data):
         data["lpmConfig"] = {}
     data["lpmConfig"][fieldName] = fieldData
     jsonData = json.dumps(data, indent=2)
@@ -884,7 +883,7 @@ def runGenericNpmCmd(cmd, packages):
 def execute(cmd, quiet):
     #process = subprocess.Popen(' '.join(cmd), encoding="utf-8", errors='replace', shell=True)
     process = subprocess.Popen(' '.join(cmd), stdout=subprocess.PIPE, encoding="utf-8", errors='replace', shell=True)
-    while process.returncode == None:
+    while process.returncode is None:
         rawStdOut = process.stdout.readline()
         #rawStdErr = process.stderr.readline()
         strippedStdOut = rawStdOut.rstrip()
@@ -900,25 +899,25 @@ def execute(cmd, quiet):
 
 def executeStandard(cmd):
     process = subprocess.Popen(' '.join(cmd), encoding="utf-8", errors='replace', shell=True)
-    while process.returncode == None:
+    while process.returncode is None:
         process.poll()
     if (process.returncode != 0):
         raise Exception('Error during process execution')
 
 def executeAndContinue(cmd):
-    process = subprocess.Popen(' '.join(cmd), encoding="utf-8", errors='replace', shell=True)
+    subprocess.Popen(' '.join(cmd), encoding="utf-8", errors='replace', shell=True)
     return
 
 def executeAndReturnCode(cmd):
     process = subprocess.Popen(' '.join(cmd), encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.PIPE, errors='replace', shell=True)
-    while process.returncode == None:
+    while process.returncode is None:
         process.poll()
     return process.returncode
 
 def executeAndReturnStdOut(cmd):
     process = subprocess.Popen(' '.join(cmd), stdout=subprocess.PIPE, encoding="utf-8", errors='replace', shell=True)
     std_out = ''
-    while process.returncode == None:
+    while process.returncode is None:
         rawStdOut = process.stdout.readline()
         strippedStdOut = rawStdOut.rstrip()
         std_out = std_out + strippedStdOut
