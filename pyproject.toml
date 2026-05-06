@@ -22,3 +22,9 @@ ignore = ["E722", "E501"]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.ruff.lint.isort]
+# `aspython` is a third-party package installed from src/ASPython. Declare it
+# explicitly so isort classifies it the same way regardless of whether the
+# submodule directory is present in the working tree.
+known-third-party = ["aspython"]

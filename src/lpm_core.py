@@ -20,10 +20,9 @@ import re
 import shutil
 import subprocess
 
+import aspython as ASTools
 import requests
 from termcolor import colored, cprint
-
-import aspython as ASTools
 
 
 def isAuthenticated():
