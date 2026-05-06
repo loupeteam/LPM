@@ -8,4 +8,4 @@ prompt-toolkit==3.0.47
 requests==2.33.0
 termcolor==2.4.0
 wcwidth==0.2.13
-urllib3==2.2.1
+urllib3==2.6.3
