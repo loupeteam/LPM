@@ -1,37 +1,36 @@
-'''
+"""
  * File: LPM.py
  * Copyright (c) 2023 Loupe
  * https://loupe.team
  *
  * This file is part of LPM, licensed under the MIT License.
-'''
-'''
+
 LPM
 This is a lightweight wrapper around NPM that processes Loupe packages.
 
 This file contains the command-line interface only. The underlying
 functionality lives in lpm_core.py.
-'''
+"""
 
-import os.path
-import json
-import sys
 import argparse
-import logging
 import ctypes
+import json
+import logging
+import os.path
+import sys
 import time
-
-version_file = os.path.normpath(os.path.join(os.path.dirname(__file__), 'version.json'))
-with open(version_file, "r") as f:
-    data = json.load(f)
-    __version__ = data["version"]
-
-__author__ = 'Andrew Musser'
 
 import aspython as ASTools
 
 # Core LPM functionality. The CLI delegates to functions defined in lpm_core.
 from lpm_core import *
+
+version_file = os.path.normpath(os.path.join(os.path.dirname(__file__), 'version.json'))
+with open(version_file, 'r') as f:
+    data = json.load(f)
+    __version__ = data['version']
+
+__author__ = 'Andrew Musser'
 
 # Spellings of flags that are global (top-level) and must appear before the
 # subcommand for argparse to recognise them.  Centralised here so that
@@ -46,11 +45,14 @@ _GLOBAL_FLAG_SPELLINGS = {'-s', '--silent', '-nc', '--nocolor'}
 # by all the cmd_* handlers below.
 # ---------------------------------------------------------------------------
 
+
 def _identity(text, color):
     return text
 
+
 def _plain_print(text, color):
     print(text)
+
 
 colored = _identity
 cprint = _plain_print
@@ -66,8 +68,17 @@ _NO_AUTH = {'login', 'logout', 'delete', 'status'}
 # Commands that may run before `lpm init` has been invoked (i.e. don't require
 # a package.json in the current directory).
 _NO_INIT_REQUIRED = {
-    'login', 'logout', 'delete', 'status',
-    'view', 'info', 'viewall', 'type', 'docs', 'as', 'init',
+    'login',
+    'logout',
+    'delete',
+    'status',
+    'view',
+    'info',
+    'viewall',
+    'type',
+    'docs',
+    'as',
+    'init',
 }
 
 
@@ -90,6 +101,7 @@ def _normalize_packages(raw_packages):
 # ---------------------------------------------------------------------------
 # Subcommand handlers. Each takes the parsed args namespace.
 # ---------------------------------------------------------------------------
+
 
 def cmd_login(args):
     if args.silent:
@@ -181,10 +193,13 @@ def cmd_as(args):
     print('Opening Automation Studio...')
     asBin = os.path.join(ASTools.getASPath(project.ASVersion), 'pg.exe')
     if not os.path.isfile(asBin):
-        cprint(f'Project was last opened with {project.ASVersion}, but that version is not installed. Trying to open with AS410 instead...', 'yellow')
+        cprint(
+            f'Project was last opened with {project.ASVersion}, but that version is not installed. Trying to open with AS410 instead...',
+            'yellow',
+        )
         # If that version isn't installed, try something else. Just hard-coding 410 for now because it's what I have installed!
         asBin = os.path.join(ASTools.getASPath('AS410'), 'pg.exe')
-    cmd = [asBin, '\"' + os.path.join(os.getcwd(), f'{project.name}.apj') + '\"']
+    cmd = [asBin, '"' + os.path.join(os.getcwd(), f'{project.name}.apj') + '"']
     executeAndContinue(cmd)
     time.sleep(3)
     cprint('Wait for it...', 'yellow')
@@ -215,7 +230,14 @@ def cmd_init(args):
         initializeProject()
         arg_folder = False
         if not args.silent:
-            text = input(colored('? ', 'green') + colored('Would you like to initialize LPM with the existing Loupe libraries in your Automation Studio project?', 'yellow') + ' (y/N) ')
+            text = input(
+                colored('? ', 'green')
+                + colored(
+                    'Would you like to initialize LPM with the existing Loupe libraries in your Automation Studio project?',
+                    'yellow',
+                )
+                + ' (y/N) '
+            )
             if text.lower() in ('y', 'yes'):
                 arg_folder = importLibraries()
         configureProject(args)
@@ -235,7 +257,14 @@ def cmd_init(args):
 
     else:
         if not args.silent:
-            text = input(colored('? ', 'green') + colored('No Automation Studio project found. Would you like to initialize this directory with a starter AS project?', 'yellow') + ' (Y/n) ')
+            text = input(
+                colored('? ', 'green')
+                + colored(
+                    'No Automation Studio project found. Would you like to initialize this directory with a starter AS project?',
+                    'yellow',
+                )
+                + ' (Y/n) '
+            )
         else:
             text = 'n'
         if text.lower() in ('n', 'no'):
@@ -284,7 +313,7 @@ def cmd_install(args):
         if packages:
             print('Attempting to install source for ' + ', '.join(args.packages) + '...')
         sourceDependencies = []
-        for (package, packageVersion) in zip(packages, packageVersions):
+        for package, packageVersion in zip(packages, packageVersions):
             installSource(package, packageVersion, sourceDependencies)
 
     # Deploy relevant objects to cpu.sw.
@@ -308,8 +337,11 @@ def cmd_install(args):
             if packageType == 'project':
                 return
     if deploymentConfigs is None:
-        cprint("Note that the installed packages have not been deployed.", "yellow")
-        cprint("You will need to do this manually, or you can configure deployment targets with the 'lpm configure' command.", 'yellow')
+        cprint('Note that the installed packages have not been deployed.', 'yellow')
+        cprint(
+            "You will need to do this manually, or you can configure deployment targets with the 'lpm configure' command.",
+            'yellow',
+        )
 
 
 def cmd_uninstall(args):
@@ -331,21 +363,21 @@ def cmd_git(args):
     packages, _ = _normalize_packages(args.packages)
     gitClient = getPackageManifestField('package.json', ['lpmConfig', 'gitClient'])
     if gitClient == '':
-        cprint("No Git client configured (please run lpm configure)", "yellow")
+        cprint('No Git client configured (please run lpm configure)', 'yellow')
         return
     if gitClient != 'GitExtensions':
-        cprint(f"We don't support {gitClient}, are you kidding?", "yellow")
+        cprint(f"We don't support {gitClient}, are you kidding?", 'yellow')
         return
-    sourceInfoFilePath = os.path.join(".", "TempObjects", "sourceInfo.json")
+    sourceInfoFilePath = os.path.join('.', 'TempObjects', 'sourceInfo.json')
     sourceInfo = getJsonData(sourceInfoFilePath)
     print(f'Opening {gitClient} for these packages: ' + ', '.join(args.packages))
     for package in packages:
-        repoPath = sourceInfo.get(package, {}).get("repoPath", None)
+        repoPath = sourceInfo.get(package, {}).get('repoPath', None)
         if repoPath is not None:
-            cmd = ['gitex.cmd', 'openrepo', '\"' + os.path.join(os.getcwd(), repoPath) + '\"']
+            cmd = ['gitex.cmd', 'openrepo', '"' + os.path.join(os.getcwd(), repoPath) + '"']
             executeAndContinue(cmd)
         else:
-            cprint(f"Could not find repo location for {package}. Verify that it is installed as source.", "yellow")
+            cprint(f'Could not find repo location for {package}. Verify that it is installed as source.', 'yellow')
 
 
 def cmd_publish(args):
@@ -354,7 +386,7 @@ def cmd_publish(args):
         cprint('Error: the package name must include the @loupeteam scope prefix.', 'yellow')
         return
     try:
-        repoUrl = data['repository']['url']  # triggers an exception if missing
+        data['repository']['url']  # triggers an exception if missing
     except:
         cprint('Error: the package.json file must include a repository parameter', 'yellow')
         cprint('For example:', 'yellow')
@@ -366,7 +398,14 @@ def cmd_publish(args):
     if args.silent:
         text = 'y'
     else:
-        text = input(colored('? ', 'green') + 'Are you sure you want to publish ' + colored(data['name'], 'yellow') + ' version ' + colored(data['version'], 'yellow') + '? (y/N) ')
+        text = input(
+            colored('? ', 'green')
+            + 'Are you sure you want to publish '
+            + colored(data['name'], 'yellow')
+            + ' version '
+            + colored(data['version'], 'yellow')
+            + '? (y/N) '
+        )
     if text.lower() not in ('y', 'yes'):
         return
     try:
@@ -376,7 +415,7 @@ def cmd_publish(args):
         execute(['npm', 'publish'], True)
         cprint('Successfully published ' + data['name'] + ' version ' + data['version'] + '.', 'green')
     except:
-        cprint("Error while publishing. Please check the detailed error message above.", 'yellow')
+        cprint('Error while publishing. Please check the detailed error message above.', 'yellow')
 
 
 def cmd_list(args):
@@ -401,16 +440,22 @@ def cmd_npm_passthrough(args):
 # Argument parser construction.
 # ---------------------------------------------------------------------------
 
+
 def _build_parser(prog_name):
     parser = argparse.ArgumentParser(
         description='A lightweight wrapper around NPM for Automation Studio dependency management',
         prog=prog_name,
     )
     # Global flags (apply to all subcommands).
-    parser.add_argument('-s', '--silent', action='store_true',
-                        help='Execute commands silently with default values and no operator prompts')
-    parser.add_argument('-nc', '--nocolor', action='store_true',
-                        help="Don't color the output - to avoid dependency on termcolor")
+    parser.add_argument(
+        '-s',
+        '--silent',
+        action='store_true',
+        help='Execute commands silently with default values and no operator prompts',
+    )
+    parser.add_argument(
+        '-nc', '--nocolor', action='store_true', help="Don't color the output - to avoid dependency on termcolor"
+    )
     parser.add_argument('-v', '--version', action='version', version='%(prog)s: ' + __version__)
 
     sub = parser.add_subparsers(dest='cmd', metavar='command')
@@ -458,10 +503,12 @@ def _build_parser(prog_name):
 
     # init
     p = sub.add_parser('init', help='Initialize the current directory for use with LPM')
-    p.add_argument('-prj', '--asproject', action='store_true',
-                   help='Force LPM to treat current directory as AS project')
-    p.add_argument('-lib', '--aslibrary', action='store_true',
-                   help='Force LPM to treat current directory as AS library')
+    p.add_argument(
+        '-prj', '--asproject', action='store_true', help='Force LPM to treat current directory as AS project'
+    )
+    p.add_argument(
+        '-lib', '--aslibrary', action='store_true', help='Force LPM to treat current directory as AS library'
+    )
     p.set_defaults(func=cmd_init)
 
     # configure
@@ -475,8 +522,7 @@ def _build_parser(prog_name):
     # install
     p = sub.add_parser('install', help='Install one or more packages')
     p.add_argument('packages', nargs='*')
-    p.add_argument('-src', '--source', action='store_true',
-                   help='Use source code for libraries instead of binaries')
+    p.add_argument('-src', '--source', action='store_true', help='Use source code for libraries instead of binaries')
     p.set_defaults(func=cmd_install)
 
     # uninstall
@@ -507,8 +553,8 @@ def _hoist_global_flags(argv):
     This allows both ``lpm --silent install`` and ``lpm install --silent``.
     """
     global_flags = _GLOBAL_FLAG_SPELLINGS
-    prefix = []   # tokens up to and including the subcommand
-    suffix = []   # tokens after the subcommand
+    prefix = []  # tokens up to and including the subcommand
+    suffix = []  # tokens after the subcommand
     cmd_found = False
     for token in argv:
         if not cmd_found:
@@ -555,6 +601,7 @@ def _is_known_command(parser, sub, argv):
 # Entry point.
 # ---------------------------------------------------------------------------
 
+
 def main():
     global colored, cprint
 
@@ -580,7 +627,9 @@ def main():
 
     # Configure output coloring now that --nocolor is known.
     if not ns.nocolor:
-        from termcolor import colored as _colored, cprint as _cprint
+        from termcolor import colored as _colored
+        from termcolor import cprint as _cprint
+
         colored = _colored
         cprint = _cprint
     else:
@@ -605,7 +654,7 @@ def main():
     ns.func(ns)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Configure colored logger
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
     kernel32 = ctypes.windll.kernel32
