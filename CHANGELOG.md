@@ -1,5 +1,20 @@
 # Change log
 
+- 1.2.0 - Add `--no-check` flag to `lpm login` for CI machine tokens
+        - Allow global flags to appear after the subcommand (e.g. `lpm install --silent`)
+        - Add fallback repo source path resolution when no Jenkinsfile is present
+        - Update ASPython to latest
+
+- 1.1.1 - Sync and deploy all dependencies when `lpm install` is run with no arguments
+        - Publish releases as an npm package
+        - Update ASPython dependency to support AS6
+
+- 1.1.0 - Refactor CLI to use argparse subparsers
+        - Split library between command-line interface and core functionality
+        - Improve `lpm login`: require `--token` with `--silent`, support `--token` in interactive mode
+        - Allow `lpm logout` without authentication so it can always clear stale credentials
+        - Normalize packages before passing to `npm list`
+
 - 1.0.6 - Fix installation of packages as source. 
         - Add pytesting infrastructure.
         
