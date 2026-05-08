@@ -1,9 +1,15 @@
 # Change log
 
-- 1.2.0 - Add `--no-check` flag to `lpm login` for CI machine tokens
-        - Allow global flags to appear after the subcommand (e.g. `lpm install --silent`)
+- 1.2.0 - Allow global flags to appear after the subcommand (e.g. `lpm install --silent`)
         - Add fallback repo source path resolution when no Jenkinsfile is present
-        - Update ASPython to latest
+        - Fix `lpm viewall` to report an accurate `LASTUPDATED` value
+        - Update ASPython imports to the new lowercase module name (aliased as ASTools to preserve existing references)
+        - Make `package.json` the single source of truth for version
+        - Add Ruff lint and format checks to CI
+        - Add GitHub Actions workflow to run tests on PRs and pushes to main
+        - Add test coverage reporting and unit tests for pure helpers
+        - Document the release workflow in the README
+        - Update ASPython and bump runtime and CI dependencies
 
 - 1.1.1 - Sync and deploy all dependencies when `lpm install` is run with no arguments
         - Publish releases as an npm package
