@@ -1,7 +1,9 @@
 """Unit tests for pure helpers in LPM.py.
 
-These tests do not touch the filesystem, network, npm, or Automation Studio —
-they exercise argv munging and package-name normalization in isolation.
+These tests don't hit the network, npm, or Automation Studio — they exercise
+argv munging and package-name normalization in isolation. (Importing `LPM`
+does read `src/version.json` at module load time, but that's the only
+filesystem touch and it's incidental to the tests themselves.)
 """
 
 import pytest

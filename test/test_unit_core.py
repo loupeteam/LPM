@@ -153,15 +153,15 @@ class TestGetRepoName:
         with patch.object(lpm_core, 'getLoupePackageData', return_value=(None, fake_data)):
             assert lpm_core.getRepoName('@loupeteam/atn') == 'atn'
 
-    def test_returns_none_when_html_url_missing(self, capsys):
+    def test_returns_none_when_html_url_missing(self):
         fake_data = {'repository': {}}
         with patch.object(lpm_core, 'getLoupePackageData', return_value=(None, fake_data)):
             assert lpm_core.getRepoName('@loupeteam/atn') is None
 
-    def test_returns_none_when_repository_missing(self, capsys):
+    def test_returns_none_when_repository_missing(self):
         with patch.object(lpm_core, 'getLoupePackageData', return_value=(None, {})):
             assert lpm_core.getRepoName('@loupeteam/atn') is None
 
-    def test_returns_none_on_error(self, capsys):
+    def test_returns_none_on_error(self):
         with patch.object(lpm_core, 'getLoupePackageData', return_value=('boom', None)):
             assert lpm_core.getRepoName('@loupeteam/atn') is None
