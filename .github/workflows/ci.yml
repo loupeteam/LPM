@@ -47,8 +47,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt pytest pytest-cov
-          pip install ./src/ASPython
+          python -m pip install -r requirements.txt pytest pytest-cov
+          python -m pip install ./src/ASPython
 
       # Write ~/.npmrc so that `npm whoami` and `npm install` can reach
       # the GitHub Package Registry.  LPM_TOKEN must be a classic PAT with
