@@ -16,12 +16,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
 
       - name: Set up Node.js for GitHub Packages
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           registry-url: 'https://npm.pkg.github.com'
@@ -46,7 +46,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
@@ -66,7 +66,7 @@ jobs:
   #     SM_HOST: ${{ secrets.SM_HOST }}
   #   steps:
   #     - name: Check out repository code
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@v6
   #       with:
   #         submodules: true
   #
@@ -118,7 +118,7 @@ jobs:
   #         aws s3 cp ./build/LPM-Setup.exe s3://loupe-lpm-assets/releases/${{ github.ref_name }}/LPM-Setup.exe
   #
   #     - name: Attach EXE to GitHub Release
-  #       uses: softprops/action-gh-release@v2
+  #       uses: softprops/action-gh-release@v3
   #       with:
   #         tag_name: ${{ github.ref_name }}
   #         files: ./build/LPM-Setup.exe

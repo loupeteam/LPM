@@ -50,9 +50,13 @@ def getAuthenticatedUser():
 
 def getLocalToken():
     # Search in the local .npmrc file for this token.
-    f = open(os.path.join(os.path.expanduser('~'), '.npmrc'), 'r')
-    text = f.readlines()
-    return re.search('_authToken=(.+)', '\n'.join(text)).group(1)
+    npmrcPath = os.path.join(os.path.expanduser('~'), '.npmrc')
+    with open(npmrcPath, 'r') as f:
+        text = f.readlines()
+    match = re.search('_authToken=(.+)', '\n'.join(text))
+    if match is None:
+        raise RuntimeError(f'No GitHub auth token found in {npmrcPath}. Run `lpm login` first.')
+    return match.group(1)
 
 
 # Bootstrap the project with required files.
@@ -613,7 +617,7 @@ def syncPackages(packages):
             # Skip sync'ing of other types (packages or libraries) if we're not in a project.
             pass
 
-        elif (packageType == 'program') | (packageType == 'package'):
+        elif packageType in ('program', 'package'):
             destination = getPackageDestination(packageManifest)
             # Find the module(s) in node_modules, and sync it/them.
             for module in os.listdir(os.path.join('node_modules', '@loupeteam')):
@@ -676,7 +680,7 @@ def deployPackages(config, packages):
                     os.path.join('Logical', libraryLocation), os.path.split(package)[1], libraryAttributes
                 )
 
-            elif (packageType == 'program') | (packageType == 'package'):
+            elif packageType in ('program', 'package'):
                 cpuDeployment = getPackageManifestField(packageManifest, ['lpm', 'physical', 'cpu'])
                 taskLocation = getPackageDestination(packageManifest)
                 # First deploy all configured tasks.
