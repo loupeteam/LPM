@@ -27,21 +27,15 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@loupeteam'
 
-      - name: Validate versions match tag
+      - name: Validate package.json version matches tag
         shell: bash
         run: |
           tag_version="${{ github.ref_name }}"
           tag_version="${tag_version#v}"
           pkg_version=$(node -p "require('./package.json').version")
-          src_version=$(python3 -c "import json; print(json.load(open('src/version.json'))['version'])")
           if [ "$pkg_version" != "$tag_version" ]; then
             echo "ERROR: package.json version ($pkg_version) does not match tag ($tag_version)."
-            echo "Bump the version in package.json and src/version.json before tagging."
-            exit 1
-          fi
-          if [ "$src_version" != "$tag_version" ]; then
-            echo "ERROR: src/version.json version ($src_version) does not match tag ($tag_version)."
-            echo "Bump the version in package.json and src/version.json before tagging."
+            echo "Use 'npm version <patch|minor|major|x.y.z>' to bump and tag in one step."
             exit 1
           fi
           echo "Version check passed: $tag_version"

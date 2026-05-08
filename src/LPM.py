@@ -25,10 +25,20 @@ import aspython as ASTools
 # Core LPM functionality. The CLI delegates to functions defined in lpm_core.
 from lpm_core import *
 
-version_file = os.path.normpath(os.path.join(os.path.dirname(__file__), 'version.json'))
-with open(version_file, 'r') as f:
-    data = json.load(f)
-    __version__ = data['version']
+
+def _load_version():
+    here = os.path.dirname(__file__)
+    # In a source/npm checkout, package.json is one level up from src/.
+    # In the flattened Inno installer layout, it sits next to this file.
+    for candidate in (os.path.join(here, '..', 'package.json'), os.path.join(here, 'package.json')):
+        path = os.path.normpath(candidate)
+        if os.path.isfile(path):
+            with open(path, 'r') as f:
+                return json.load(f)['version']
+    raise RuntimeError('Unable to locate package.json to determine LPM version')
+
+
+__version__ = _load_version()
 
 __author__ = 'Andrew Musser'
 

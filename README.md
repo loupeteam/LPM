@@ -1,6 +1,6 @@
 # LPM
 
-![version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Floupeteam%2FLPM%2Fmain%2Fsrc%2Fversion.json&query=%24.version&label=version)
+![version badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Floupeteam%2FLPM%2Fmain%2Fpackage.json&query=%24.version&label=version)
 
 This tool is provided by Loupe.  
 https://loupe.team  
@@ -17,6 +17,19 @@ LPM is the Loupe Package Manager. This tool is designed to make it easy to inter
 ## Documentation
 
 Documentation for LPM use, including detailed installation instructions and use cases, can be found [here](https://loupeteam.github.io/LoupeDocs/tools/lpm.html). 
+
+## Releasing a new version
+
+`package.json` is the single source of truth for the LPM version — `LPM.py` reads it at runtime, and the GitHub release workflow validates that the pushed tag matches it.
+
+To cut a release:
+
+```sh
+npm version patch       # or: minor, major, or an explicit version like 1.3.0 / 1.3.0-beta.1
+git push --follow-tags
+```
+
+`npm version` bumps `package.json`, creates a commit, and tags `v<version>` in one atomic step. Pushing the tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which publishes the package to the GitHub npm registry and creates a GitHub Release.
 
 ## Licensing
 This project is licensed under the [MIT License](LICENSE.md). 
