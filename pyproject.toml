@@ -28,3 +28,11 @@ quote-style = "single"
 # explicitly so isort classifies it the same way regardless of whether the
 # submodule directory is present in the working tree.
 known-third-party = ["aspython"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/ASPython/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
