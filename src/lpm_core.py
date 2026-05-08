@@ -19,6 +19,7 @@ import os.path
 import re
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 
 import aspython as ASTools
 import requests
@@ -867,6 +868,14 @@ def printLoupePackageList():
             except:
                 package_descriptions.append(' ')
 
+        # The `updated_at` returned by /orgs/{org}/packages doesn't reliably reflect
+        # the most recent version publish (it often reports the package's initial
+        # publish date), so fetch each package's latest version date directly.
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            last_updated_dates = list(
+                executor.map(lambda p: getLoupePackageLatestVersionDate(p['name']), packages_sorted)
+            )
+
         # Determine column widths.
         name_col_width = max(len(package['name']) for package in packages_sorted) + 2
         version_col_width = 12
@@ -888,10 +897,16 @@ def printLoupePackageList():
         )
 
         for idx, package in enumerate(packages_sorted):
+            date_error, latest_date = last_updated_dates[idx]
+            if not date_error and latest_date:
+                last_updated = latest_date[:10]
+            else:
+                fallback = package.get('updated_at') or ''
+                last_updated = fallback[:10] if fallback else 'unknown'
             print(
                 package['name'].ljust(name_col_width)
                 + str(package['version_count']).ljust(version_col_width)
-                + package['updated_at'][:10].ljust(lastmod_col_width)
+                + last_updated.ljust(lastmod_col_width)
                 + package_descriptions[idx].ljust(description_col_width)
             )
     else:
@@ -952,6 +967,38 @@ def getLoupePackageData(packageName: str):
         return (error, [])  # Early return
     packageData = json.loads(r.content)
     return (None, packageData)
+
+
+# Fetches the most recently published version's timestamp for a package.
+# Returns (error, isoDateString) tuple; error is None on success.
+def getLoupePackageLatestVersionDate(packageName: str):
+    try:
+        token = getLocalToken()
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+        }
+        organization = 'loupeteam'
+        packageNameStripped = os.path.split(packageName)[1]
+        r = requests.get(
+            f'https://api.github.com/orgs/{organization}/packages/npm/{packageNameStripped}/versions',
+            headers=headers,
+            params={'per_page': '1'},
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return (f'Status code not OK. Code: {r.status_code}', None)
+        versions = json.loads(r.content)
+        if not isinstance(versions, list) or not versions:
+            return ('No versions found', None)
+        # GitHub returns versions sorted by created_at descending.
+        latest = versions[0]
+        if not isinstance(latest, dict):
+            return ('Unexpected version payload', None)
+        return (None, latest.get('updated_at') or latest.get('created_at'))
+    except Exception as e:
+        return (f'Failed to fetch latest version date: {e}', None)
 
 
 # Run a generic NPM command on the specified packages.
