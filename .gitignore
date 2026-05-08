@@ -132,3 +132,6 @@ dmypy.json
 # Exclude temp directory (for testing)
 /temp
 /test/asproject_template_*
+
+# Claude Code local state
+.claude/
