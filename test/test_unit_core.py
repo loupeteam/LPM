@@ -233,9 +233,7 @@ class TestGetAllDependencies:
 
     def test_dedupes_diamond_dependencies(self, tmp_path, monkeypatch):
         # A -> B, A -> C, B -> D, C -> D. D appears once in result.
-        self._writeManifest(
-            tmp_path, '@a/a', {'lpm': {'type': 'library'}, 'dependencies': {'@a/b': '*', '@a/c': '*'}}
-        )
+        self._writeManifest(tmp_path, '@a/a', {'lpm': {'type': 'library'}, 'dependencies': {'@a/b': '*', '@a/c': '*'}})
         self._writeManifest(tmp_path, '@a/b', {'lpm': {'type': 'library'}, 'dependencies': {'@a/d': '*'}})
         self._writeManifest(tmp_path, '@a/c', {'lpm': {'type': 'library'}, 'dependencies': {'@a/d': '*'}})
         self._writeManifest(tmp_path, '@a/d', {'lpm': {'type': 'library'}})
