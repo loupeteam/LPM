@@ -165,3 +165,95 @@ class TestGetRepoName:
     def test_returns_none_on_error(self):
         with patch.object(lpm_core, 'getLoupePackageData', return_value=('boom', None)):
             assert lpm_core.getRepoName('@loupeteam/atn') is None
+
+
+class TestGetAllDependencies:
+    """getAllDependencies walks a project's node_modules to build a flat list
+    of lpm-managed packages to sync. These tests build a fake node_modules
+    layout under tmp_path and chdir into it so we exercise the real
+    file-reading code paths.
+    """
+
+    @staticmethod
+    def _writeManifest(root, packageName, manifest):
+        # packageName may include a scope ('@scope/name') or be bare ('name').
+        manifestPath = root / 'node_modules' / packageName / 'package.json'
+        manifestPath.parent.mkdir(parents=True, exist_ok=True)
+        manifestPath.write_text(json.dumps(manifest))
+
+    def test_single_lpm_package_with_no_deps_returns_itself(self, tmp_path, monkeypatch):
+        self._writeManifest(tmp_path, '@a/x', {'lpm': {'type': 'library'}})
+        monkeypatch.chdir(tmp_path)
+        assert lpm_core.getAllDependencies(['@a/x']) == ['@a/x']
+
+    def test_walks_lpm_managed_transitive_deps(self, tmp_path, monkeypatch):
+        # @a/x is lpm-managed and depends on @a/y, which is also lpm-managed.
+        self._writeManifest(tmp_path, '@a/x', {'lpm': {'type': 'library'}, 'dependencies': {'@a/y': '*'}})
+        self._writeManifest(tmp_path, '@a/y', {'lpm': {'type': 'library'}})
+        monkeypatch.chdir(tmp_path)
+        result = lpm_core.getAllDependencies(['@a/x'])
+        assert result == ['@a/x', '@a/y']
+
+    def test_non_lpm_package_is_a_leaf(self, tmp_path, monkeypatch):
+        # Regression for the opcua-proxy hang: a package with no `lpm` field
+        # must NOT have its (potentially huge) npm dep tree walked. We create
+        # real manifests for the npm deps so an unfixed walker would happily
+        # recurse into them; the assertion is that only the requested package
+        # comes back.
+        self._writeManifest(
+            tmp_path,
+            '@a/x',
+            {'dependencies': {'express': '*', 'node-opcua': '*'}},
+        )
+        self._writeManifest(tmp_path, 'express', {'dependencies': {'body-parser': '*'}})
+        self._writeManifest(tmp_path, 'body-parser', {})
+        self._writeManifest(tmp_path, 'node-opcua', {})
+        monkeypatch.chdir(tmp_path)
+        result = lpm_core.getAllDependencies(['@a/x'])
+        # Only @a/x — none of the plain npm packages, transitive or otherwise,
+        # should appear in the lpm sync list.
+        assert result == ['@a/x']
+
+    def test_skips_packages_with_missing_manifest(self, tmp_path, monkeypatch):
+        # Regression for #83: a transitive dep that npm hoisted to a nested
+        # location is not at node_modules/<name>/package.json. Must skip it
+        # rather than crashing.
+        self._writeManifest(tmp_path, '@a/x', {'lpm': {'type': 'library'}, 'dependencies': {'@a/missing': '*'}})
+        monkeypatch.chdir(tmp_path)
+        # Should return @a/x and silently skip @a/missing.
+        assert lpm_core.getAllDependencies(['@a/x']) == ['@a/x']
+
+    def test_handles_dependency_cycles(self, tmp_path, monkeypatch):
+        # A -> B -> A. Memoization must terminate the walk.
+        self._writeManifest(tmp_path, '@a/x', {'lpm': {'type': 'library'}, 'dependencies': {'@a/y': '*'}})
+        self._writeManifest(tmp_path, '@a/y', {'lpm': {'type': 'library'}, 'dependencies': {'@a/x': '*'}})
+        monkeypatch.chdir(tmp_path)
+        result = lpm_core.getAllDependencies(['@a/x'])
+        assert sorted(result) == ['@a/x', '@a/y']
+
+    def test_dedupes_diamond_dependencies(self, tmp_path, monkeypatch):
+        # A -> B, A -> C, B -> D, C -> D. D appears once in result.
+        self._writeManifest(
+            tmp_path, '@a/a', {'lpm': {'type': 'library'}, 'dependencies': {'@a/b': '*', '@a/c': '*'}}
+        )
+        self._writeManifest(tmp_path, '@a/b', {'lpm': {'type': 'library'}, 'dependencies': {'@a/d': '*'}})
+        self._writeManifest(tmp_path, '@a/c', {'lpm': {'type': 'library'}, 'dependencies': {'@a/d': '*'}})
+        self._writeManifest(tmp_path, '@a/d', {'lpm': {'type': 'library'}})
+        monkeypatch.chdir(tmp_path)
+        result = lpm_core.getAllDependencies(['@a/a'])
+        assert sorted(result) == ['@a/a', '@a/b', '@a/c', '@a/d']
+        assert result.count('@a/d') == 1
+
+    def test_hmi_project_short_circuits_recursion(self, tmp_path, monkeypatch):
+        # hmi-project deps are deliberately not walked recursively (they're
+        # entire applications, not libraries). Existing behavior preserved.
+        self._writeManifest(
+            tmp_path,
+            '@a/hmi',
+            {'lpm': {'type': 'hmi-project'}, 'dependencies': {'@a/should-not-walk': '*'}},
+        )
+        self._writeManifest(tmp_path, '@a/should-not-walk', {'lpm': {'type': 'library'}})
+        monkeypatch.chdir(tmp_path)
+        result = lpm_core.getAllDependencies(['@a/hmi'])
+        # Returns the original input untouched, not the walked tree.
+        assert result == ['@a/hmi']
