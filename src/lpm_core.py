@@ -526,6 +526,11 @@ def getAllDependencies(packages):
     for package in packages:
         # Introspect the package.json for this file. Find its 'lpm/type' field.
         packageManifest = os.path.join('node_modules', package, 'package.json')
+        # Transitive npm deps may not live at the top-level node_modules path
+        # (npm 7+ hoists/nests by its own rules). Treat a missing manifest as
+        # "not an lpm-managed package, skip" — npm has already handled it.
+        if not os.path.exists(packageManifest):
+            continue
         packageType = getPackageManifestField(packageManifest, ['lpm', 'type'])
         # When dealing with an HMI project, don't parse through its dependencies recursively! That gets deep real fast.
         if packageType == 'hmi-project':
@@ -599,6 +604,10 @@ def syncPackages(packages):
     for package in packages:
         # Introspect the package.json for this file. Find its 'lpm' section.
         packageManifest = os.path.join('node_modules', package, 'package.json')
+        # Defensive: a caller may hand us a package whose manifest npm hoisted
+        # elsewhere. Without a manifest there's nothing lpm can sync, so skip.
+        if not os.path.exists(packageManifest):
+            continue
         packageType = getPackageManifestField(packageManifest, ['lpm', 'type'])
         # Do something different based on package type.
         if packageType == 'project':
