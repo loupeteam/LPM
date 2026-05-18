@@ -282,8 +282,10 @@ def cmd_init(args):
             print(colored('This directory has been initialized as a stand-alone package manager.', 'green'))
         else:
             initializeProject()
-            starterProject = ['@loupeteam/starterasproject49']
-            installPackages(starterProject, [''])
+            starterProject = ['@loupeteam/starterasproject']
+            # Install the latest version; npm's default caret range in
+            # package.json pins us to compatible (non-major) upgrades.
+            installPackages(starterProject, ['latest'])
             syncPackages(starterProject)
             configureProject(args)
             print(colored('Your local directory is now ready to be used with LPM.', 'green'))
