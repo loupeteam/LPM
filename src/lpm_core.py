@@ -521,9 +521,18 @@ def getRepoName(package):
 
 # Retrieve a deep list of all dependencies of the specified packages.
 # This is recursive logic that hurts my brain, but seems to work.
-def getAllDependencies(packages):
+def getAllDependencies(packages, _seen=None):
+    # _seen is an internal recursion-scoped set used to memoize visited
+    # packages so cycles and diamond deps don't re-walk the same subtree.
+    # Callers should always omit it.
+    if _seen is None:
+        _seen = set()
     dependencies = []
     for package in packages:
+        lowerPackage = package.lower()
+        if lowerPackage in _seen:
+            continue
+        _seen.add(lowerPackage)
         # Introspect the package.json for this file. Find its 'lpm/type' field.
         packageManifest = os.path.join('node_modules', package, 'package.json')
         # Transitive npm deps may not live at the top-level node_modules path
@@ -536,27 +545,20 @@ def getAllDependencies(packages):
         if packageType == 'hmi-project':
             return packages
         dependencies.append(package)
-        # If package.json exists, get dependencies from there.
-        if os.path.exists(os.path.join('node_modules', package, 'package.json')):
-            dependencyData = getPackageManifestField(
-                os.path.join('node_modules', package, 'package.json'), ['dependencies']
-            )
-            if dependencyData is None:
-                dependencyData = []
-        # If there is no package.json for this package, assume it's a source library, and that it's already sync'd
-        # to the Logical View under Libraries / Loupe.
-        else:
-            # Strip it of its @loupeteam prefix.
-            splitPackage = os.path.split(package)[1]
-            dependencyData = getLibrarySourceDependencies(
-                os.path.join('.', 'Logical', 'Libraries', 'Loupe', splitPackage)
-            )
-            print('Source dependencies: ')
-            print(dependencyData)
+        # Plain npm packages (no `lpm` config) are leaves from lpm's
+        # perspective: npm has already placed them and there's nothing for
+        # lpm to sync. Walking their transitive npm deps (e.g. node-opcua's
+        # hundreds of subpackages) is wasteful at best and can hang the
+        # install at worst.
+        if packageType is None:
+            continue
+        dependencyData = getPackageManifestField(packageManifest, ['dependencies'])
+        if dependencyData is None:
+            dependencyData = []
         localDependencies = []
         for item in dependencyData:
             localDependencies.append(item)
-        nestedDependencies = getAllDependencies(localDependencies)
+        nestedDependencies = getAllDependencies(localDependencies, _seen)
         for item in nestedDependencies:
             dependencies.append(item)
     # Before returning the list, sanitize it by removing duplicates.
