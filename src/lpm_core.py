@@ -13,17 +13,51 @@ LPM.py and is responsible for argument parsing and user-facing output;
 everything else lives here so it can be reused and tested in isolation.
 """
 
+import itertools
 import json
 import os
 import os.path
 import re
 import shutil
 import subprocess
+import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 
 import aspython as ASTools
 import requests
 from termcolor import colored, cprint
+
+
+@contextmanager
+def spinner(message):
+    # Show a rotating ASCII spinner while a silent phase runs so the user can
+    # tell lpm is still working. Falls back to a single static line when stdout
+    # isn't a TTY (CI logs, redirected output) so we don't spam carriage returns.
+    if not sys.stdout.isatty():
+        print(f'{message}...')
+        yield
+        return
+
+    stop_event = threading.Event()
+    frames = itertools.cycle('|/-\\')
+
+    def animate():
+        while not stop_event.is_set():
+            sys.stdout.write(f'\r{next(frames)} {message}...')
+            sys.stdout.flush()
+            stop_event.wait(0.1)
+
+    thread = threading.Thread(target=animate, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join(timeout=0.5)
+        sys.stdout.write('\r' + ' ' * (len(message) + 6) + '\r')
+        sys.stdout.flush()
 
 
 def isAuthenticated():
