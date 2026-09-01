@@ -319,7 +319,10 @@ def cmd_install(args):
             deps = getPackageManifestField('package.json', ['dependencies']) or {}
             packages = list(deps.keys())
         # Move packages from the node_modules folder into the project/main directory.
-        syncPackages(getAllDependencies(packages))
+        with spinner('Resolving dependencies'):
+            allDeps = getAllDependencies(packages)
+        with spinner('Syncing packages'):
+            syncPackages(allDeps)
         sourceDependencies = []
     else:
         if packages:
@@ -334,13 +337,15 @@ def cmd_install(args):
         print('Deploying ' + ', '.join(packages) + ' to the following configurations: ' + ', '.join(deploymentConfigs))
         for config in deploymentConfigs:
             if not args.source:
-                deployPackages(config, getAllDependencies(packages))
+                with spinner(f'Deploying to {config}'):
+                    deployPackages(config, getAllDependencies(packages))
             else:
                 # TODO: this split below may not be necessary, TBD.
                 # For case of source, deploy the source first.
-                deployPackages(config, packages)
-                # Then deploy all of its dependencies.
-                deployPackages(config, sourceDependencies)
+                with spinner(f'Deploying source to {config}'):
+                    deployPackages(config, packages)
+                    # Then deploy all of its dependencies.
+                    deployPackages(config, sourceDependencies)
     cprint('Operation completed successfully.', 'green')
     for package in packages:
         packageManifestPath = os.path.join('node_modules', package, 'package.json')
@@ -367,7 +372,10 @@ def cmd_uninstall(args):
     except:
         cprint('Error while attempting to uninstall package(s).', 'yellow')
         return
-    syncPackages(getAllDependencies(packages))
+    with spinner('Resolving dependencies'):
+        allDeps = getAllDependencies(packages)
+    with spinner('Syncing packages'):
+        syncPackages(allDeps)
     cprint('Operation completed successfully.', 'green')
 
 
